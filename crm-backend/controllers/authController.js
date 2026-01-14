@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 exports.register = async (req, res) => {
-  const { firstName, lastName, email, password, role } = req.body;
+  const { firstName, lastName, name, email, password, role } = req.body;
 
   try {
     // Check if user exists
@@ -13,22 +13,44 @@ exports.register = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Handle both name formats: single 'name' field or separate firstName/lastName
+    let finalFirstName = firstName || '';
+    let finalLastName = lastName || '';
+    
+    if (name && !firstName && !lastName) {
+      const nameParts = name.trim().split(' ');
+      finalFirstName = nameParts[0] || 'User';
+      finalLastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'User';
+    }
+    
+    // Ensure both names have values (required by User model)
+    if (!finalFirstName) finalFirstName = 'User';
+    if (!finalLastName) finalLastName = 'User';
+
     const newUser = new User({
-      firstName,
-      lastName,
+      firstName: finalFirstName,
+      lastName: finalLastName,
       email,
       password: hashedPassword,
-      role,
+      role: role || 'user',
     });
 
     await newUser.save();
     const payload = { userId: newUser._id };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    res.json({ token });
+    res.json({ 
+      token,
+      user: {
+        id: newUser._id,
+        name: `${newUser.firstName} ${newUser.lastName}`.trim(),
+        email: newUser.email,
+        role: newUser.role
+      }
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Register error:', err.message, err.stack);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
 
@@ -45,7 +67,15 @@ exports.login = async (req, res) => {
     const payload = { userId: user._id };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    res.json({ token });
+    res.json({ 
+      token,
+      user: {
+        id: user._id,
+        name: `${user.firstName} ${user.lastName}`.trim(),
+        email: user.email,
+        role: user.role
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

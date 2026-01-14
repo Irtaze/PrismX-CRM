@@ -2,6 +2,21 @@ const Customer = require('../models/Customer');
 
 exports.createCustomer = async (req, res) => {
   const { userID, name, email, phoneNumber, cardReference } = req.body;
+  
+  // Validation
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ message: 'Validation error: name is required' });
+  }
+  if (!email || email.trim() === '') {
+    return res.status(400).json({ message: 'Validation error: email is required' });
+  }
+  
+  // Email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: 'Validation error: please provide a valid email address' });
+  }
+  
   try {
     const newCustomer = new Customer({
       userID,
@@ -13,6 +28,13 @@ exports.createCustomer = async (req, res) => {
     await newCustomer.save();
     res.status(201).json(newCustomer);
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Validation error: email already exists' });
+    }
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ message: 'Validation error', errors });
+    }
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };

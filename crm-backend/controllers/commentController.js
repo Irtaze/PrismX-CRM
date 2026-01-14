@@ -2,11 +2,30 @@ const Comment = require('../models/Comment');
 
 exports.createComment = async (req, res) => {
   const { userID, entityType, entityID, content } = req.body;
+  
+  // Validation
+  if (!userID) {
+    return res.status(400).json({ message: 'Validation error: userID is required' });
+  }
+  if (!entityType) {
+    return res.status(400).json({ message: 'Validation error: entityType is required' });
+  }
+  if (!entityID) {
+    return res.status(400).json({ message: 'Validation error: entityID is required' });
+  }
+  if (!content || content.trim() === '') {
+    return res.status(400).json({ message: 'Validation error: content is required' });
+  }
+  
   try {
     const newComment = new Comment({ userID, entityType, entityID, content });
     await newComment.save();
     res.status(201).json(newComment);
   } catch (err) {
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ message: 'Validation error', errors });
+    }
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };

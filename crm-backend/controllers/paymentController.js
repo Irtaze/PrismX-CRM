@@ -2,11 +2,30 @@ const Payment = require('../models/Payment');
 
 exports.createPayment = async (req, res) => {
   const { saleID, customerID, amount, paymentMethod, status } = req.body;
+  
+  // Validation
+  if (!saleID) {
+    return res.status(400).json({ message: 'Validation error: saleID is required' });
+  }
+  if (!customerID) {
+    return res.status(400).json({ message: 'Validation error: customerID is required' });
+  }
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ message: 'Validation error: amount must be a positive number' });
+  }
+  if (!paymentMethod) {
+    return res.status(400).json({ message: 'Validation error: paymentMethod is required (credit_card, bank_transfer, cash, or check)' });
+  }
+  
   try {
     const newPayment = new Payment({ saleID, customerID, amount, paymentMethod, status });
     await newPayment.save();
     res.status(201).json(newPayment);
   } catch (err) {
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ message: 'Validation error', errors });
+    }
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };

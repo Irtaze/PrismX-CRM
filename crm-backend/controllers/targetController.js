@@ -2,11 +2,36 @@ const Target = require('../models/Target');
 
 exports.createTarget = async (req, res) => {
   const { userID, targetAmount, period, startDate, endDate, status } = req.body;
+  
+  // Validation
+  if (!userID) {
+    return res.status(400).json({ message: 'Validation error: userID is required' });
+  }
+  if (!targetAmount || targetAmount <= 0) {
+    return res.status(400).json({ message: 'Validation error: targetAmount must be a positive number' });
+  }
+  if (!period) {
+    return res.status(400).json({ message: 'Validation error: period is required (monthly, quarterly, or yearly)' });
+  }
+  if (!startDate) {
+    return res.status(400).json({ message: 'Validation error: startDate is required' });
+  }
+  if (!endDate) {
+    return res.status(400).json({ message: 'Validation error: endDate is required' });
+  }
+  if (new Date(endDate) <= new Date(startDate)) {
+    return res.status(400).json({ message: 'Validation error: endDate must be after startDate' });
+  }
+  
   try {
     const newTarget = new Target({ userID, targetAmount, period, startDate, endDate, status });
     await newTarget.save();
     res.status(201).json(newTarget);
   } catch (err) {
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ message: 'Validation error', errors });
+    }
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };

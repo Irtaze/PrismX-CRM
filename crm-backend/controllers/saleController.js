@@ -2,11 +2,27 @@ const Sale = require('../models/Sale');
 
 exports.createSale = async (req, res) => {
   const { userID, customerID, amount, status, description } = req.body;
+  
+  // Validation
+  if (!userID) {
+    return res.status(400).json({ message: 'Validation error: userID is required' });
+  }
+  if (!customerID) {
+    return res.status(400).json({ message: 'Validation error: customerID is required' });
+  }
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ message: 'Validation error: amount must be a positive number' });
+  }
+  
   try {
     const newSale = new Sale({ userID, customerID, amount, status, description });
     await newSale.save();
     res.status(201).json(newSale);
   } catch (err) {
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ message: 'Validation error', errors });
+    }
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };

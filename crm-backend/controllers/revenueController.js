@@ -2,11 +2,27 @@ const Revenue = require('../models/Revenue');
 
 exports.createRevenue = async (req, res) => {
   const { saleID, amount, source, category } = req.body;
+  
+  // Validation
+  if (!saleID) {
+    return res.status(400).json({ message: 'Validation error: saleID is required' });
+  }
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ message: 'Validation error: amount must be a positive number' });
+  }
+  if (!source || source.trim() === '') {
+    return res.status(400).json({ message: 'Validation error: source is required' });
+  }
+  
   try {
     const newRevenue = new Revenue({ saleID, amount, source, category });
     await newRevenue.save();
     res.status(201).json(newRevenue);
   } catch (err) {
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ message: 'Validation error', errors });
+    }
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
