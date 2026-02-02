@@ -16,34 +16,42 @@ exports.register = async (req, res) => {
     // Handle both name formats: single 'name' field or separate firstName/lastName
     let finalFirstName = firstName || '';
     let finalLastName = lastName || '';
+    let finalName = name || '';
     
     if (name && !firstName && !lastName) {
       const nameParts = name.trim().split(' ');
       finalFirstName = nameParts[0] || 'User';
       finalLastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'User';
+    } else if (firstName || lastName) {
+      finalName = `${firstName || ''} ${lastName || ''}`.trim();
     }
     
     // Ensure both names have values (required by User model)
     if (!finalFirstName) finalFirstName = 'User';
     if (!finalLastName) finalLastName = 'User';
+    if (!finalName) finalName = `${finalFirstName} ${finalLastName}`.trim();
+
+    // Allow admin role for bootstrap. After initial setup, admin users should be created via admin API
+    const userRole = (role && ['admin', 'manager', 'agent'].includes(role)) ? role : 'agent';
 
     const newUser = new User({
       firstName: finalFirstName,
       lastName: finalLastName,
+      name: finalName,
       email,
       password: hashedPassword,
-      role: role || 'user',
+      role: userRole,
     });
 
     await newUser.save();
-    const payload = { userId: newUser._id };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const payload = { userId: newUser._id, role: newUser.role };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
 
     res.json({ 
       token,
       user: {
         id: newUser._id,
-        name: `${newUser.firstName} ${newUser.lastName}`.trim(),
+        name: newUser.name || `${newUser.firstName} ${newUser.lastName}`.trim(),
         email: newUser.email,
         role: newUser.role
       }
@@ -64,14 +72,14 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-    const payload = { userId: user._id };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const payload = { userId: user._id, role: user.role };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
 
     res.json({ 
       token,
       user: {
         id: user._id,
-        name: `${user.firstName} ${user.lastName}`.trim(),
+        name: user.name || `${user.firstName} ${user.lastName}`.trim(),
         email: user.email,
         role: user.role
       }

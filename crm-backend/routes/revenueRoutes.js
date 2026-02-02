@@ -1,6 +1,6 @@
 const express = require('express');
 const { createRevenue, getRevenues, getRevenueById, updateRevenue, deleteRevenue } = require('../controllers/revenueController');
-const auth = require('../middlewares/auth');
+const { auth } = require('../middlewares/auth');
 
 const router = express.Router();
 

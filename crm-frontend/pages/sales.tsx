@@ -1,10 +1,40 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useMemo } from 'react';
 import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../utils/useAuth';
-import { salesAPI, customerAPI, Sale, SaleInput, Customer } from '../services/api';
-import { FaPlus, FaEdit, FaTrash, FaSearch, FaTimes, FaShoppingCart, FaDollarSign, FaCalendar } from 'react-icons/fa';
+import { Sale, SaleInput, Customer } from '../services/api';
+import dataService from '../services/dataService';
+import { FaPlus, FaEdit, FaTrash, FaSearch, FaTimes, FaShoppingCart, FaDollarSign, FaCalendar, FaChartLine, FaChartBar, FaChartPie } from 'react-icons/fa';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
+
+type TimePeriod = 'weekly' | 'monthly' | 'yearly';
 
 const Sales: React.FC = () => {
   const { isLoading, user } = useAuth();
@@ -15,6 +45,8 @@ const Sales: React.FC = () => {
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('monthly');
+  const [showGraphs, setShowGraphs] = useState<boolean>(true);
   const [formData, setFormData] = useState<SaleInput>({
     customerID: '',
     amount: 0,
@@ -30,19 +62,21 @@ const Sales: React.FC = () => {
 
   const fetchCustomers = async (): Promise<void> => {
     try {
-      const response = await customerAPI.getAll();
-      setCustomers(response.data);
+      const customers = await dataService.fetchAllCustomers();
+      setCustomers(customers);
     } catch (error) {
       console.error('Failed to fetch customers:', error);
+      setError('Failed to load customers. Please refresh the page.');
     }
   };
 
   const fetchSales = async (): Promise<void> => {
     try {
-      const response = await salesAPI.getAll();
-      setSales(response.data);
+      const sales = await dataService.fetchAllSales();
+      setSales(sales);
     } catch (error) {
       console.error('Failed to fetch sales:', error);
+      setError('Failed to load sales data. Please refresh the page.');
     } finally {
       setLoading(false);
     }
@@ -65,9 +99,9 @@ const Sales: React.FC = () => {
 
     try {
       if (editingSale) {
-        await salesAPI.update(editingSale._id, formData);
+        await dataService.updateSale(editingSale._id, formData);
       } else {
-        await salesAPI.create(formData);
+        await dataService.createSale(formData);
       }
       fetchSales();
       closeModal();
@@ -80,10 +114,11 @@ const Sales: React.FC = () => {
   const handleDelete = async (id: string): Promise<void> => {
     if (confirm('Are you sure you want to delete this sale?')) {
       try {
-        await salesAPI.delete(id);
+        await dataService.deleteSale(id);
         fetchSales();
       } catch (error) {
         console.error('Failed to delete sale:', error);
+        setError('Failed to delete sale. Please try again.');
       }
     }
   };
@@ -92,8 +127,10 @@ const Sales: React.FC = () => {
     setError('');
     if (sale) {
       setEditingSale(sale);
+      // Handle customerID which can be string or object
+      const customerId = typeof sale.customerID === 'object' ? sale.customerID._id : sale.customerID;
       setFormData({
-        customerID: sale.customerID,
+        customerID: customerId,
         amount: sale.amount,
         status: sale.status,
         description: sale.description || '',
@@ -118,7 +155,10 @@ const Sales: React.FC = () => {
     setError('');
   };
 
-  const getCustomerName = (customerID: string): string => {
+  const getCustomerName = (customerID: string | { _id: string; name: string; email: string }): string => {
+    if (typeof customerID === 'object') {
+      return customerID.name || 'Unknown';
+    }
     const customer = customers.find(c => c._id === customerID);
     return customer ? customer.name : 'Unknown';
   };
@@ -132,6 +172,187 @@ const Sales: React.FC = () => {
 
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.amount, 0);
   const completedSales = sales.filter((s) => s.status === 'completed').length;
+
+  // Chart data calculations
+  const chartData = useMemo(() => {
+    const now = new Date();
+    let labels: string[] = [];
+    let salesData: number[] = [];
+    let revenueData: number[] = [];
+
+    if (timePeriod === 'weekly') {
+      // Last 7 days
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        labels.push(dateStr);
+        
+        const daySales = sales.filter(s => {
+          const saleDate = new Date(s.date);
+          return saleDate.toDateString() === date.toDateString();
+        });
+        salesData.push(daySales.length);
+        revenueData.push(daySales.reduce((sum, s) => sum + s.amount, 0));
+      }
+    } else if (timePeriod === 'monthly') {
+      // Last 12 months
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthStr = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        labels.push(monthStr);
+        
+        const monthSales = sales.filter(s => {
+          const saleDate = new Date(s.date);
+          return saleDate.getMonth() === date.getMonth() && saleDate.getFullYear() === date.getFullYear();
+        });
+        salesData.push(monthSales.length);
+        revenueData.push(monthSales.reduce((sum, s) => sum + s.amount, 0));
+      }
+    } else {
+      // Last 5 years
+      for (let i = 4; i >= 0; i--) {
+        const year = now.getFullYear() - i;
+        labels.push(year.toString());
+        
+        const yearSales = sales.filter(s => {
+          const saleDate = new Date(s.date);
+          return saleDate.getFullYear() === year;
+        });
+        salesData.push(yearSales.length);
+        revenueData.push(yearSales.reduce((sum, s) => sum + s.amount, 0));
+      }
+    }
+
+    return { labels, salesData, revenueData };
+  }, [sales, timePeriod]);
+
+  // Status distribution for doughnut chart
+  const statusData = useMemo(() => {
+    const pending = sales.filter(s => s.status === 'pending').length;
+    const completed = sales.filter(s => s.status === 'completed').length;
+    const cancelled = sales.filter(s => s.status === 'cancelled').length;
+    return { pending, completed, cancelled };
+  }, [sales]);
+
+  const lineChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Sales & Revenue Trend',
+        font: { size: 16 },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+    },
+  };
+
+  const lineChartData = {
+    labels: chartData.labels,
+    datasets: [
+      {
+        label: 'Number of Sales',
+        data: chartData.salesData,
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        fill: true,
+        tension: 0.4,
+      },
+    ],
+  };
+
+  const barChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Revenue Breakdown',
+        font: { size: 16 },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: function(value: any) {
+            return '$' + value.toLocaleString();
+          },
+        },
+      },
+    },
+  };
+
+  const barChartData = {
+    labels: chartData.labels,
+    datasets: [
+      {
+        label: 'Revenue ($)',
+        data: chartData.revenueData,
+        backgroundColor: [
+          'rgba(59, 130, 246, 0.8)',
+          'rgba(147, 51, 234, 0.8)',
+          'rgba(34, 197, 94, 0.8)',
+          'rgba(249, 115, 22, 0.8)',
+          'rgba(236, 72, 153, 0.8)',
+          'rgba(14, 165, 233, 0.8)',
+          'rgba(168, 85, 247, 0.8)',
+          'rgba(34, 197, 94, 0.8)',
+          'rgba(251, 146, 60, 0.8)',
+          'rgba(99, 102, 241, 0.8)',
+          'rgba(20, 184, 166, 0.8)',
+          'rgba(244, 63, 94, 0.8)',
+        ],
+        borderRadius: 8,
+      },
+    ],
+  };
+
+  const doughnutChartData = {
+    labels: ['Pending', 'Completed', 'Cancelled'],
+    datasets: [
+      {
+        data: [statusData.pending, statusData.completed, statusData.cancelled],
+        backgroundColor: [
+          'rgba(234, 179, 8, 0.8)',
+          'rgba(34, 197, 94, 0.8)',
+          'rgba(239, 68, 68, 0.8)',
+        ],
+        borderColor: [
+          'rgba(234, 179, 8, 1)',
+          'rgba(34, 197, 94, 1)',
+          'rgba(239, 68, 68, 1)',
+        ],
+        borderWidth: 2,
+      },
+    ],
+  };
+
+  const doughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+      },
+      title: {
+        display: true,
+        text: 'Sales Status Distribution',
+        font: { size: 16 },
+      },
+    },
+  };
 
   if (isLoading || loading) {
     return (
@@ -188,6 +409,65 @@ const Sales: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Graph Toggle and Time Period Selector */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+              <button
+                onClick={() => setShowGraphs(!showGraphs)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all ${
+                  showGraphs
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <FaChartLine />
+                {showGraphs ? 'Hide Charts' : 'Show Charts'}
+              </button>
+
+              {showGraphs && (
+                <div className="flex items-center gap-2 bg-white rounded-xl p-1 border border-slate-200">
+                  {(['weekly', 'monthly', 'yearly'] as TimePeriod[]).map((period) => (
+                    <button
+                      key={period}
+                      onClick={() => setTimePeriod(period)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all capitalize ${
+                        timePeriod === period
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Charts Section */}
+            {showGraphs && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
+                {/* Line Chart - Sales Trend */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 lg:col-span-2 xl:col-span-2">
+                  <div className="h-80">
+                    <Line options={lineChartOptions} data={lineChartData} />
+                  </div>
+                </div>
+
+                {/* Doughnut Chart - Status Distribution */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                  <div className="h-80">
+                    <Doughnut options={doughnutOptions} data={doughnutChartData} />
+                  </div>
+                </div>
+
+                {/* Bar Chart - Revenue Breakdown */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 lg:col-span-2 xl:col-span-3">
+                  <div className="h-80">
+                    <Bar options={barChartOptions} data={barChartData} />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">

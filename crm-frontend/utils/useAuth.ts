@@ -5,13 +5,16 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: 'admin' | 'manager' | 'agent';
 }
 
 interface UseAuthReturn {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  isAgent: boolean;
+  isManager: boolean;
 }
 
 export const useAuth = (): UseAuthReturn => {
@@ -47,6 +50,9 @@ export const useAuth = (): UseAuthReturn => {
     user,
     isLoading,
     isAuthenticated: !!user,
+    isAdmin: user?.role === 'admin',
+    isAgent: user?.role === 'agent',
+    isManager: user?.role === 'manager',
   };
 };
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const { createAuditLog, getAuditLogs, getAuditLogById, deleteAuditLog } = require('../controllers/auditLogController');
-const auth = require('../middlewares/auth');
+const { auth } = require('../middlewares/auth');
 
 const router = express.Router();
 

@@ -20,13 +20,26 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'manager', 'user'],
-    default: 'user',
+    enum: ['admin', 'manager', 'agent'],
+    default: 'agent',
   },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
+// Custom methods for role checking
+userSchema.methods.isAdmin = function () {
+  return this.role === 'admin';
+};
+
+userSchema.methods.isAgent = function () {
+  return this.role === 'agent';
+};
+
+userSchema.methods.isManager = function () {
+  return this.role === 'manager';
+};
 
 module.exports = mongoose.model('User', userSchema);

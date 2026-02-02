@@ -1,18 +1,43 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useMemo } from 'react';
 import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../utils/useAuth';
-import { targetAPI, Target, TargetInput } from '../services/api';
-import { FaPlus, FaEdit, FaTrash, FaTimes, FaBullseye, FaCalendar, FaChartLine } from 'react-icons/fa';
+import { Target, TargetInput, User } from '../services/api';
+import dataService from '../services/dataService';
+import { FaPlus, FaEdit, FaTrash, FaTimes, FaBullseye, FaCalendar, FaChartLine, FaChartBar, FaUser } from 'react-icons/fa';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar, Doughnut } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const Targets: React.FC = () => {
   const { isLoading } = useAuth();
   const [targets, setTargets] = useState<Target[]>([]);
+  const [agents, setAgents] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [editingTarget, setEditingTarget] = useState<Target | null>(null);
   const [error, setError] = useState<string>('');
+  const [showGraphs, setShowGraphs] = useState<boolean>(true);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
   const [formData, setFormData] = useState<TargetInput>({
     targetAmount: 0,
     period: 'monthly',
@@ -21,15 +46,32 @@ const Targets: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchTargets();
+    fetchData();
   }, []);
+
+  const fetchData = async (): Promise<void> => {
+    try {
+      const [targetsData, agentsData] = await Promise.all([
+        dataService.fetchAllTargets(),
+        dataService.fetchAllUsers(),
+      ]);
+      setTargets(targetsData);
+      setAgents(agentsData);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+      setError('Failed to load data. Please refresh the page.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchTargets = async (): Promise<void> => {
     try {
-      const response = await targetAPI.getAll();
-      setTargets(response.data);
+      const targets = await dataService.fetchAllTargets();
+      setTargets(targets);
     } catch (error) {
       console.error('Failed to fetch targets:', error);
+      setError('Failed to load targets data. Please refresh the page.');
     } finally {
       setLoading(false);
     }
@@ -52,9 +94,9 @@ const Targets: React.FC = () => {
 
     try {
       if (editingTarget) {
-        await targetAPI.update(editingTarget._id, formData);
+        await dataService.updateTarget(editingTarget._id, formData);
       } else {
-        await targetAPI.create(formData);
+        await dataService.createTarget(formData);
       }
       fetchTargets();
       closeModal();
@@ -67,10 +109,11 @@ const Targets: React.FC = () => {
   const handleDelete = async (id: string): Promise<void> => {
     if (confirm('Are you sure you want to delete this target?')) {
       try {
-        await targetAPI.delete(id);
+        await dataService.deleteTarget(id);
         fetchTargets();
       } catch (error) {
         console.error('Failed to delete target:', error);
+        setError('Failed to delete target. Please try again.');
       }
     }
   };
@@ -107,6 +150,137 @@ const Targets: React.FC = () => {
     return Math.min(Math.round((achieved / target) * 100), 100);
   };
 
+  const getAgentName = (userID: string): string => {
+    const agent = agents.find(a => a._id === userID);
+    return agent ? `${agent.firstName} ${agent.lastName}` : 'Unknown Agent';
+  };
+
+  // Filter targets by period
+  const filteredTargets = useMemo(() => {
+    if (selectedPeriod === 'all') return targets;
+    return targets.filter(t => t.period === selectedPeriod);
+  }, [targets, selectedPeriod]);
+
+  // Chart data: Per-agent target vs achieved
+  const agentChartData = useMemo(() => {
+    const agentMap = new Map<string, { target: number; achieved: number; name: string }>();
+    
+    filteredTargets.forEach(target => {
+      const agentName = getAgentName(target.userID);
+      if (agentMap.has(target.userID)) {
+        const existing = agentMap.get(target.userID)!;
+        existing.target += target.targetAmount;
+        existing.achieved += target.achieved;
+      } else {
+        agentMap.set(target.userID, {
+          target: target.targetAmount,
+          achieved: target.achieved,
+          name: agentName,
+        });
+      }
+    });
+
+    const labels = Array.from(agentMap.values()).map(a => a.name);
+    const targetData = Array.from(agentMap.values()).map(a => a.target);
+    const achievedData = Array.from(agentMap.values()).map(a => a.achieved);
+
+    return { labels, targetData, achievedData };
+  }, [filteredTargets, agents]);
+
+  // Status distribution
+  const statusData = useMemo(() => {
+    const inProgress = filteredTargets.filter(t => t.status === 'in_progress').length;
+    const completed = filteredTargets.filter(t => t.status === 'completed').length;
+    const failed = filteredTargets.filter(t => t.status === 'failed').length;
+    return { inProgress, completed, failed };
+  }, [filteredTargets]);
+
+  // Overall stats
+  const stats = useMemo(() => {
+    const totalTarget = filteredTargets.reduce((sum, t) => sum + t.targetAmount, 0);
+    const totalAchieved = filteredTargets.reduce((sum, t) => sum + t.achieved, 0);
+    const overallProgress = totalTarget > 0 ? Math.round((totalAchieved / totalTarget) * 100) : 0;
+    return { totalTarget, totalAchieved, overallProgress };
+  }, [filteredTargets]);
+
+  const barChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Agent Target Progress',
+        font: { size: 16 },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: function(value: any) {
+            return '$' + value.toLocaleString();
+          },
+        },
+      },
+    },
+  };
+
+  const barChartData = {
+    labels: agentChartData.labels,
+    datasets: [
+      {
+        label: 'Target ($)',
+        data: agentChartData.targetData,
+        backgroundColor: 'rgba(99, 102, 241, 0.8)',
+        borderRadius: 4,
+      },
+      {
+        label: 'Achieved ($)',
+        data: agentChartData.achievedData,
+        backgroundColor: 'rgba(34, 197, 94, 0.8)',
+        borderRadius: 4,
+      },
+    ],
+  };
+
+  const doughnutData = {
+    labels: ['In Progress', 'Completed', 'Failed'],
+    datasets: [
+      {
+        data: [statusData.inProgress, statusData.completed, statusData.failed],
+        backgroundColor: [
+          'rgba(59, 130, 246, 0.8)',
+          'rgba(34, 197, 94, 0.8)',
+          'rgba(239, 68, 68, 0.8)',
+        ],
+        borderColor: [
+          'rgba(59, 130, 246, 1)',
+          'rgba(34, 197, 94, 1)',
+          'rgba(239, 68, 68, 1)',
+        ],
+        borderWidth: 2,
+      },
+    ],
+  };
+
+  const doughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+      },
+      title: {
+        display: true,
+        text: 'Target Status Distribution',
+        font: { size: 16 },
+      },
+    },
+  };
+
   if (isLoading || loading) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center">
@@ -126,11 +300,86 @@ const Targets: React.FC = () => {
           <Navbar title="Targets" />
 
           <main className="p-8">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <p className="text-slate-500">Track and manage your sales targets</p>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-blue-100 rounded-xl">
+                    <FaBullseye className="text-blue-600 text-xl" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Total Targets</p>
+                    <p className="text-2xl font-bold text-slate-800">{filteredTargets.length}</p>
+                  </div>
+                </div>
               </div>
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-indigo-100 rounded-xl">
+                    <FaChartBar className="text-indigo-600 text-xl" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Target Amount</p>
+                    <p className="text-2xl font-bold text-slate-800">${stats.totalTarget.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-green-100 rounded-xl">
+                    <FaChartLine className="text-green-600 text-xl" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Total Achieved</p>
+                    <p className="text-2xl font-bold text-slate-800">${stats.totalAchieved.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-purple-100 rounded-xl">
+                    <FaCalendar className="text-purple-600 text-xl" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Overall Progress</p>
+                    <p className="text-2xl font-bold text-slate-800">{stats.overallProgress}%</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowGraphs(!showGraphs)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all ${
+                    showGraphs
+                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <FaChartBar />
+                  {showGraphs ? 'Hide Charts' : 'Show Charts'}
+                </button>
+
+                <div className="flex items-center gap-2 bg-white rounded-xl p-1 border border-slate-200">
+                  {['all', 'monthly', 'quarterly', 'yearly'].map((period) => (
+                    <button
+                      key={period}
+                      onClick={() => setSelectedPeriod(period)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all capitalize ${
+                        selectedPeriod === period
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button
                 onClick={() => openModal()}
                 className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg shadow-blue-500/25"
@@ -140,14 +389,40 @@ const Targets: React.FC = () => {
               </button>
             </div>
 
+            {/* Charts Section */}
+            {showGraphs && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                {/* Bar Chart - Agent Progress */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 lg:col-span-2">
+                  <div className="h-80">
+                    <Bar options={barChartOptions} data={barChartData} />
+                  </div>
+                </div>
+
+                {/* Doughnut Chart - Status Distribution */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                  <div className="h-80">
+                    <Doughnut options={doughnutOptions} data={doughnutData} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="text-slate-500">Track and manage your sales targets</p>
+              </div>
+            </div>
+
             {/* Targets Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {targets.length === 0 ? (
+              {filteredTargets.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-slate-500">
                   No targets found
                 </div>
               ) : (
-                targets.map((target) => {
+                filteredTargets.map((target) => {
                   const progress = calculateProgress(target.achieved, target.targetAmount);
                   const isAchieved = target.achieved >= target.targetAmount;
 
@@ -178,9 +453,22 @@ const Targets: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* Agent Name */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <FaUser className="text-slate-400 text-sm" />
+                        <span className="text-sm font-medium text-slate-600">{getAgentName(target.userID)}</span>
+                      </div>
+
                       <div className="mb-4">
                         <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full capitalize">
                           {target.period}
+                        </span>
+                        <span className={`ml-2 px-3 py-1 text-xs font-semibold rounded-full capitalize ${
+                          target.status === 'completed' ? 'bg-green-100 text-green-600' :
+                          target.status === 'failed' ? 'bg-red-100 text-red-600' :
+                          'bg-blue-100 text-blue-600'
+                        }`}>
+                          {target.status?.replace('_', ' ')}
                         </span>
                       </div>
 

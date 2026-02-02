@@ -15,6 +15,7 @@ app.use(bodyParser.json()); // Parse incoming JSON requests
 
 // Routes
 app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/customers', require('./routes/customerRoutes'));
 app.use('/api/sales', require('./routes/saleRoutes'));
 app.use('/api/revenues', require('./routes/revenueRoutes'));
@@ -23,6 +24,10 @@ app.use('/api/targets', require('./routes/targetRoutes'));
 app.use('/api/performances', require('./routes/performanceRoutes'));
 app.use('/api/auditlogs', require('./routes/auditLogRoutes'));
 app.use('/api/comments', require('./routes/commentRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/settings', require('./routes/settingsRoutes'));
+app.use('/api/services', require('./routes/serviceRoutes'));
+app.use('/api/customer-services', require('./routes/customerServiceRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

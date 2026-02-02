@@ -3,17 +3,24 @@ import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../utils/useAuth';
-import { customerAPI, Customer, CustomerInput } from '../services/api';
-import { FaPlus, FaEdit, FaTrash, FaSearch, FaTimes, FaUser, FaEnvelope, FaPhone, FaBuilding } from 'react-icons/fa';
+import { Customer, CustomerInput, CustomerService, Service, customerServiceAPI, serviceAPI } from '../services/api';
+import dataService from '../services/dataService';
+import { FaPlus, FaEdit, FaTrash, FaSearch, FaTimes, FaUser, FaEnvelope, FaPhone, FaCreditCard, FaEye, FaEyeSlash, FaBox, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 
 const Customers: React.FC = () => {
   const { isLoading } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerServices, setCustomerServices] = useState<{[key: string]: CustomerService[]}>({});
+  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [showServiceModal, setShowServiceModal] = useState<boolean>(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null);
+  const [visibleCards, setVisibleCards] = useState<{[key: string]: boolean}>({});
   const [formData, setFormData] = useState<CustomerInput>({
     name: '',
     email: '',
@@ -21,16 +28,39 @@ const Customers: React.FC = () => {
     cardReference: '',
   });
 
+  const [serviceFormData, setServiceFormData] = useState({
+    serviceID: '',
+    amount: '',
+    notes: '',
+  });
+
   useEffect(() => {
-    fetchCustomers();
+    fetchData();
   }, []);
 
-  const fetchCustomers = async (): Promise<void> => {
+  const fetchData = async (): Promise<void> => {
     try {
-      const response = await customerAPI.getAll();
-      setCustomers(response.data);
+      const [customersData, servicesData] = await Promise.all([
+        dataService.fetchAllCustomers(),
+        serviceAPI.getAll().catch(() => ({ data: [] })),
+      ]);
+      setCustomers(customersData);
+      setServices(servicesData.data);
+      
+      // Fetch customer services
+      const csData: {[key: string]: CustomerService[]} = {};
+      for (const customer of customersData) {
+        try {
+          const response = await customerServiceAPI.getByCustomer(customer._id);
+          csData[customer._id] = response.data;
+        } catch (e) {
+          csData[customer._id] = [];
+        }
+      }
+      setCustomerServices(csData);
     } catch (error) {
-      console.error('Failed to fetch customers:', error);
+      console.error('Failed to fetch data:', error);
+      setError('Failed to load data. Please refresh the page.');
     } finally {
       setLoading(false);
     }
@@ -55,11 +85,11 @@ const Customers: React.FC = () => {
 
     try {
       if (editingCustomer) {
-        await customerAPI.update(editingCustomer._id, formData);
+        await dataService.updateCustomer(editingCustomer._id, formData);
       } else {
-        await customerAPI.create(formData);
+        await dataService.createCustomer(formData);
       }
-      fetchCustomers();
+      fetchData();
       closeModal();
     } catch (error: any) {
       console.error('Failed to save customer:', error);
@@ -67,13 +97,45 @@ const Customers: React.FC = () => {
     }
   };
 
+  const handleAddService = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    if (!selectedCustomer || !serviceFormData.serviceID) return;
+    
+    try {
+      await customerServiceAPI.create({
+        customerID: selectedCustomer._id,
+        serviceID: serviceFormData.serviceID,
+        amount: parseFloat(serviceFormData.amount) || 0,
+        notes: serviceFormData.notes,
+      });
+      fetchData();
+      setShowServiceModal(false);
+      setServiceFormData({ serviceID: '', amount: '', notes: '' });
+    } catch (error: any) {
+      console.error('Failed to add service:', error);
+      setError(error.response?.data?.message || 'Failed to add service.');
+    }
+  };
+
+  const handleRemoveService = async (csId: string): Promise<void> => {
+    if (confirm('Remove this service from customer?')) {
+      try {
+        await customerServiceAPI.delete(csId);
+        fetchData();
+      } catch (error) {
+        console.error('Failed to remove service:', error);
+      }
+    }
+  };
+
   const handleDelete = async (id: string): Promise<void> => {
     if (confirm('Are you sure you want to delete this customer?')) {
       try {
-        await customerAPI.delete(id);
-        fetchCustomers();
+        await dataService.deleteCustomer(id);
+        fetchData();
       } catch (error) {
         console.error('Failed to delete customer:', error);
+        setError('Failed to delete customer. Please try again.');
       }
     }
   };
@@ -100,6 +162,29 @@ const Customers: React.FC = () => {
     setEditingCustomer(null);
     setFormData({ name: '', email: '', phoneNumber: '', cardReference: '' });
     setError('');
+  };
+
+  const toggleCardVisibility = (customerId: string) => {
+    setVisibleCards(prev => ({ ...prev, [customerId]: !prev[customerId] }));
+  };
+
+  const maskCardReference = (cardRef: string) => {
+    if (!cardRef || cardRef.length < 4) return '****';
+    return '*'.repeat(cardRef.length - 4) + cardRef.slice(-4);
+  };
+
+  const toggleExpand = (customerId: string) => {
+    setExpandedCustomer(prev => prev === customerId ? null : customerId);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-700';
+      case 'pending': return 'bg-yellow-100 text-yellow-700';
+      case 'completed': return 'bg-blue-100 text-blue-700';
+      case 'cancelled': return 'bg-red-100 text-red-700';
+      default: return 'bg-slate-100 text-slate-700';
+    }
   };
 
   const filteredCustomers = customers.filter(
@@ -154,66 +239,137 @@ const Customers: React.FC = () => {
               </button>
             </div>
 
-            {/* Customers Table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">Customer</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">Email</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">Phone</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">Card Ref</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">Date Added</th>
-                    <th className="text-center px-6 py-4 text-sm font-semibold text-slate-600">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCustomers.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-center py-12 text-slate-500">
-                        No customers found
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredCustomers.map((customer) => (
-                      <tr key={customer._id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                              <FaUser className="text-white" />
+            {/* Customers List */}
+            <div className="space-y-4">
+              {filteredCustomers.length === 0 ? (
+                <div className="bg-white rounded-2xl p-12 text-center text-slate-500">
+                  No customers found
+                </div>
+              ) : (
+                filteredCustomers.map((customer) => (
+                  <div key={customer._id} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    {/* Customer Header */}
+                    <div className="p-4 md:p-6">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <FaUser className="text-white text-lg" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-lg text-slate-800">{customer.name}</h3>
+                            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mt-1">
+                              <span className="flex items-center gap-1">
+                                <FaEnvelope className="text-slate-400" />
+                                {customer.email}
+                              </span>
+                              {customer.phoneNumber && (
+                                <span className="flex items-center gap-1">
+                                  <FaPhone className="text-slate-400" />
+                                  {customer.phoneNumber}
+                                </span>
+                              )}
                             </div>
-                            <span className="font-semibold text-slate-800">{customer.name}</span>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-slate-600">{customer.email}</td>
-                        <td className="px-6 py-4 text-slate-600">{customer.phoneNumber || '-'}</td>
-                        <td className="px-6 py-4 text-slate-600">{customer.cardReference || '-'}</td>
-                        <td className="px-6 py-4 text-slate-600">
-                          {new Date(customer.dateAdded).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => openModal(customer)}
-                              className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                              data-testid={`edit-customer-${customer._id}`}
-                            >
-                              <FaEdit />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(customer._id)}
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                              data-testid={`delete-customer-${customer._id}`}
-                            >
-                              <FaTrash />
-                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {/* Card Reference with Eye Toggle */}
+                          {customer.cardReference && (
+                            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg">
+                              <FaCreditCard className="text-slate-400" />
+                              <span className="text-sm font-mono text-slate-600">
+                                {visibleCards[customer._id] 
+                                  ? customer.cardReference 
+                                  : maskCardReference(customer.cardReference)}
+                              </span>
+                              <button
+                                onClick={() => toggleCardVisibility(customer._id)}
+                                className="text-slate-400 hover:text-slate-600 transition-colors"
+                                title={visibleCards[customer._id] ? 'Hide card' : 'Show card'}
+                              >
+                                {visibleCards[customer._id] ? <FaEyeSlash /> : <FaEye />}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          <button
+                            onClick={() => {
+                              setSelectedCustomer(customer);
+                              setShowServiceModal(true);
+                            }}
+                            className="p-2 text-green-500 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Add Service"
+                          >
+                            <FaBox />
+                          </button>
+                          <button
+                            onClick={() => openModal(customer)}
+                            className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <FaEdit />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(customer._id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <FaTrash />
+                          </button>
+                          <button
+                            onClick={() => toggleExpand(customer._id)}
+                            className="p-2 text-slate-400 hover:bg-slate-50 rounded-lg transition-colors"
+                          >
+                            {expandedCustomer === customer._id ? <FaChevronUp /> : <FaChevronDown />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Services Section (Expandable) */}
+                    {expandedCustomer === customer._id && (
+                      <div className="border-t border-slate-100 bg-slate-50 p-4 md:p-6">
+                        <h4 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                          <FaBox className="text-blue-500" />
+                          Services ({customerServices[customer._id]?.length || 0})
+                        </h4>
+                        
+                        {customerServices[customer._id]?.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {customerServices[customer._id].map((cs) => (
+                              <div key={cs._id} className="bg-white p-4 rounded-xl border border-slate-100">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <p className="font-semibold text-slate-800">
+                                      {typeof cs.serviceID === 'object' ? cs.serviceID.name : 'Service'}
+                                    </p>
+                                    <p className="text-sm text-slate-500 mt-1">
+                                      ${cs.amount.toFixed(2)}
+                                    </p>
+                                    <span className={`inline-block mt-2 px-2 py-1 text-xs rounded-full ${getStatusColor(cs.status)}`}>
+                                      {cs.status}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleRemoveService(cs._id)}
+                                    className="text-red-400 hover:text-red-600"
+                                  >
+                                    <FaTrash size={12} />
+                                  </button>
+                                </div>
+                                {cs.notes && (
+                                  <p className="text-xs text-slate-400 mt-2">{cs.notes}</p>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                        ) : (
+                          <p className="text-slate-500 text-sm">No services assigned to this customer</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </main>
         </div>
@@ -289,12 +445,12 @@ const Customers: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Card Reference</label>
                   <div className="relative">
-                    <FaBuilding className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <FaCreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
                       value={formData.cardReference}
                       onChange={(e) => setFormData({ ...formData, cardReference: e.target.value })}
-                      className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400"
                       placeholder="Optional"
                       data-testid="cardreference-input"
                     />
@@ -307,6 +463,88 @@ const Customers: React.FC = () => {
                   data-testid="submit-customer-button"
                 >
                   {editingCustomer ? 'Update Customer' : 'Add Customer'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Add Service Modal */}
+        {showServiceModal && selectedCustomer && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-slate-800">
+                  Add Service to {selectedCustomer.name}
+                </h2>
+                <button 
+                  onClick={() => {
+                    setShowServiceModal(false);
+                    setSelectedCustomer(null);
+                    setServiceFormData({ serviceID: '', amount: '', notes: '' });
+                  }} 
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <FaTimes size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddService} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Service <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={serviceFormData.serviceID}
+                    onChange={(e) => {
+                      const service = services.find(s => s._id === e.target.value);
+                      setServiceFormData({ 
+                        ...serviceFormData, 
+                        serviceID: e.target.value,
+                        amount: service ? service.price.toString() : '',
+                      });
+                    }}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Select a service</option>
+                    {services.map(service => (
+                      <option key={service._id} value={service._id}>
+                        {service.name} - ${service.price}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Amount</label>
+                  <input
+                    type="number"
+                    value={serviceFormData.amount}
+                    onChange={(e) => setServiceFormData({ ...serviceFormData, amount: e.target.value })}
+                    placeholder="Enter amount"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Notes</label>
+                  <textarea
+                    value={serviceFormData.notes}
+                    onChange={(e) => setServiceFormData({ ...serviceFormData, notes: e.target.value })}
+                    placeholder="Add any notes (optional)"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-teal-700 transition-all"
+                >
+                  Add Service
                 </button>
               </form>
             </div>

@@ -67,21 +67,25 @@ export const authAPI = {
   login: (credentials: LoginCredentials) => api.post<AuthResponse>('/users/login', credentials),
   register: (data: RegisterData) => api.post<AuthResponse>('/users/register', data),
   getProfile: () => api.get('/users/profile'),
+  updateProfile: (data: { firstName?: string; lastName?: string; email?: string }) => 
+    api.put('/users/profile', data),
+  changePassword: (data: { oldPassword: string; newPassword: string }) => 
+    api.put('/users/change-password', data),
 };
 
 // Customer APIs
 export interface Customer {
   _id: string;
-  userID?: string;
+  agentID?: string | { _id: string; name: string; email: string; role: string };
   name: string;
   email: string;
   phoneNumber: string;
   cardReference?: string;
   dateAdded: string;
+  createdAt?: string;
 }
 
 export interface CustomerInput {
-  userID?: string;
   name: string;
   email: string;
   phoneNumber: string;
@@ -99,8 +103,8 @@ export const customerAPI = {
 // Sales APIs
 export interface Sale {
   _id: string;
-  userID: string;
-  customerID: string;
+  agentID: string | { _id: string; name: string; email: string; role: string };
+  customerID: string | { _id: string; name: string; email: string };
   amount: number;
   status: string;
   description?: string;
@@ -109,7 +113,6 @@ export interface Sale {
 }
 
 export interface SaleInput {
-  userID?: string; // Optional in input as it can be auto-filled from auth
   customerID: string;
   amount: number;
   status?: string;
@@ -202,9 +205,9 @@ export interface RevenueInput {
 }
 
 export const revenueAPI = {
-  getAll: () => api.get<Revenue[]>('/revenue'),
-  getById: (id: string) => api.get<Revenue>(`/revenue/${id}`),
-  create: (data: RevenueInput) => api.post<Revenue>('/revenue', data),
+  getAll: () => api.get<Revenue[]>('/revenues'),
+  getById: (id: string) => api.get<Revenue>(`/revenues/${id}`),
+  create: (data: RevenueInput) => api.post<Revenue>('/revenues', data),
   update: (id: string, data: Partial<RevenueInput>) => api.put<Revenue>(`/revenue/${id}`, data),
   delete: (id: string) => api.delete(`/revenue/${id}`),
 };
@@ -223,14 +226,16 @@ export interface Performance {
 }
 
 export const performanceAPI = {
-  getAll: () => api.get<Performance[]>('/performance'),
-  getMyPerformance: () => api.get<Performance>('/performance/me'),
+  getAll: () => api.get<Performance[]>('/performances'),
+  getMyPerformance: () => api.get<Performance>('/performances/me'),
 };
 
 // User/Agent APIs
 export interface User {
   _id: string;
-  name: string;
+  name?: string; // For backwards compatibility
+  firstName: string;
+  lastName: string;
   email: string;
   role: string;
   createdAt: string;
@@ -239,6 +244,8 @@ export interface User {
 export const userAPI = {
   getAll: () => api.get<User[]>('/users'),
   getById: (id: string) => api.get<User>(`/users/${id}`),
+  update: (id: string, data: Partial<User>) => api.put<User>(`/users/${id}`, data),
+  delete: (id: string) => api.delete(`/users/${id}`),
 };
 
 // Comment APIs
@@ -265,6 +272,179 @@ export const commentAPI = {
   create: (data: CommentInput) => api.post<Comment>('/comments', data),
   update: (id: string, data: Partial<CommentInput>) => api.put<Comment>(`/comments/${id}`, data),
   delete: (id: string) => api.delete(`/comments/${id}`),
+};
+
+// Notification APIs
+export interface Notification {
+  _id: string;
+  userID: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error' | 'sale' | 'target' | 'system';
+  isRead: boolean;
+  link?: string;
+  createdAt: string;
+}
+
+export const notificationAPI = {
+  getAll: () => api.get<Notification[]>('/notifications'),
+  getUnreadCount: () => api.get<{ count: number }>('/notifications/unread-count'),
+  create: (data: { title: string; message: string; type?: string; link?: string; userID?: string }) => 
+    api.post<Notification>('/notifications', data),
+  markAsRead: (id: string) => api.put<Notification>(`/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/notifications/mark-all-read'),
+  delete: (id: string) => api.delete(`/notifications/${id}`),
+  clearAll: () => api.delete('/notifications'),
+};
+
+// Settings APIs
+export interface SettingsData {
+  notifications?: {
+    emailNotifications?: boolean;
+    pushNotifications?: boolean;
+    salesAlerts?: boolean;
+    targetAlerts?: boolean;
+    systemUpdates?: boolean;
+  };
+  privacy?: {
+    showEmail?: boolean;
+    showPhone?: boolean;
+    showPerformance?: boolean;
+  };
+  display?: {
+    theme?: 'light' | 'dark' | 'system';
+    language?: string;
+    currency?: string;
+    dateFormat?: string;
+  };
+}
+
+export interface Settings {
+  _id: string;
+  userID: string;
+  notifications: {
+    emailNotifications: boolean;
+    pushNotifications: boolean;
+    salesAlerts: boolean;
+    targetAlerts: boolean;
+    systemUpdates: boolean;
+  };
+  privacy: {
+    showEmail: boolean;
+    showPhone: boolean;
+    showPerformance: boolean;
+  };
+  display: {
+    theme: 'light' | 'dark' | 'system';
+    language: string;
+    currency: string;
+    dateFormat: string;
+  };
+  updatedAt: string;
+}
+
+export const settingsAPI = {
+  get: () => api.get<Settings>('/settings'),
+  update: (data: Partial<SettingsData>) => api.put<Settings>('/settings', data),
+  reset: () => api.post<Settings>('/settings/reset'),
+};
+
+// Service APIs
+export interface Service {
+  _id: string;
+  name: string;
+  description?: string;
+  price: number;
+  category: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface ServiceInput {
+  name: string;
+  description?: string;
+  price: number;
+  category: string;
+}
+
+export const serviceAPI = {
+  getAll: () => api.get<Service[]>('/services'),
+  getById: (id: string) => api.get<Service>(`/services/${id}`),
+  create: (data: ServiceInput) => api.post<Service>('/services', data),
+  update: (id: string, data: Partial<ServiceInput>) => api.put<Service>(`/services/${id}`, data),
+  delete: (id: string) => api.delete(`/services/${id}`),
+};
+
+// Customer Service APIs
+export interface CustomerService {
+  _id: string;
+  customerID: Customer;
+  serviceID: Service;
+  status: 'active' | 'pending' | 'completed' | 'cancelled';
+  startDate: string;
+  endDate?: string;
+  amount: number;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface CustomerServiceInput {
+  customerID: string;
+  serviceID: string;
+  amount: number;
+  startDate?: string;
+  endDate?: string;
+  notes?: string;
+}
+
+export const customerServiceAPI = {
+  getAll: () => api.get<CustomerService[]>('/customer-services'),
+  getByCustomer: (customerId: string) => api.get<CustomerService[]>(`/customer-services/customer/${customerId}`),
+  create: (data: CustomerServiceInput) => api.post<CustomerService>('/customer-services', data),
+  update: (id: string, data: Partial<CustomerServiceInput>) => api.put<CustomerService>(`/customer-services/${id}`, data),
+  delete: (id: string) => api.delete(`/customer-services/${id}`),
+};
+
+// Admin APIs (Admin only)
+export interface Agent {
+  _id: string;
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+  phoneNumber?: string;
+  role: 'agent' | 'manager' | 'admin';
+  createdAt: string;
+}
+
+export interface AgentInput {
+  name: string;
+  email: string;
+  password: string;
+  phoneNumber?: string;
+}
+
+export interface AgentStats {
+  agent: Agent;
+  stats: {
+    totalCustomers: number;
+    totalSales: number;
+    totalRevenue: number;
+    completedSales: number;
+  };
+}
+
+export const adminAPI = {
+  // Agent management
+  createAgent: (data: AgentInput) => api.post<{ message: string; agent: Agent }>('/admin/agents', data),
+  getAgents: () => api.get<Agent[]>('/admin/agents'),
+  getAgentById: (id: string) => api.get<Agent>(`/admin/agents/${id}`),
+  updateAgent: (id: string, data: Partial<AgentInput>) => api.put<{ message: string; agent: Agent }>(`/admin/agents/${id}`, data),
+  deleteAgent: (id: string) => api.delete(`/admin/agents/${id}`),
+  getAgentStats: (id: string) => api.get<AgentStats>(`/admin/agents/${id}/stats`),
+  
+  // All users
+  getAllUsers: () => api.get<Agent[]>('/admin/users'),
 };
 
 export default api;
