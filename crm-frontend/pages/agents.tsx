@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../utils/useAuth';
 import { Agent, adminAPI } from '../services/api';
-import { FaSearch, FaUserTie, FaEnvelope, FaSync, FaTrophy, FaDollarSign, FaPlus, FaEdit, FaTrash, FaTimes, FaUsers, FaLock, FaUserShield } from 'react-icons/fa';
+import { FaSearch, FaUserTie, FaEnvelope, FaSync, FaTrophy, FaDollarSign, FaPlus, FaEdit, FaTrash, FaTimes, FaUsers, FaLock, FaUserShield, FaCrown, FaUserCog } from 'react-icons/fa';
 
 interface AgentStats {
   totalCustomers: number;
@@ -19,6 +19,7 @@ interface AgentFormData {
   email: string;
   password: string;
   phoneNumber: string;
+  role: 'admin' | 'manager' | 'agent';
 }
 
 const Agents: React.FC = () => {
@@ -39,6 +40,7 @@ const Agents: React.FC = () => {
     email: '',
     password: '',
     phoneNumber: '',
+    role: 'agent',
   });
 
   // Redirect non-admin users
@@ -58,11 +60,11 @@ const Agents: React.FC = () => {
 
   const fetchData = async (): Promise<void> => {
     try {
-      const agentsResponse = await adminAPI.getAgents();
-      const agentsData = agentsResponse.data;
-      setAgents(agentsData);
+      const usersResponse = await adminAPI.getAllUsers();
+      const usersData = usersResponse.data;
+      setAgents(usersData);
 
-      const statsPromises = agentsData.map(async (agent) => {
+      const statsPromises = usersData.map(async (agent) => {
         try {
           const statsResponse = await adminAPI.getAgentStats(agent._id);
           return { id: agent._id, stats: statsResponse.data.stats };
@@ -101,10 +103,11 @@ const Agents: React.FC = () => {
         email: agent.email,
         password: '',
         phoneNumber: agent.phoneNumber || '',
+        role: agent.role,
       });
     } else {
       setEditingAgent(null);
-      setFormData({ name: '', email: '', password: '', phoneNumber: '' });
+      setFormData({ name: '', email: '', password: '', phoneNumber: '', role: 'agent' });
     }
     setShowModal(true);
   };
@@ -142,15 +145,16 @@ const Agents: React.FC = () => {
           name: formData.name,
           email: formData.email,
           phoneNumber: formData.phoneNumber,
+          role: formData.role,
         };
         if (formData.password) {
           updateData.password = formData.password;
         }
-        await adminAPI.updateAgent(editingAgent._id, updateData);
-        setSuccess('Agent updated successfully!');
+        await adminAPI.updateUser(editingAgent._id, updateData);
+        setSuccess('User updated successfully!');
       } else {
-        await adminAPI.createAgent(formData);
-        setSuccess('Agent created successfully!');
+        await adminAPI.createUser(formData);
+        setSuccess(`${formData.role.charAt(0).toUpperCase() + formData.role.slice(1)} created successfully!`);
       }
       fetchData();
       setTimeout(closeModal, 1500);
@@ -162,18 +166,18 @@ const Agents: React.FC = () => {
   };
 
   const handleDelete = async (agentId: string): Promise<void> => {
-    if (!confirm('Are you sure you want to delete this agent? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       return;
     }
 
     try {
-      await adminAPI.deleteAgent(agentId);
-      setSuccess('Agent deleted successfully');
+      await adminAPI.deleteUser(agentId);
+      setSuccess('User deleted successfully');
       fetchData();
     } catch (error: unknown) {
-      console.error('Error deleting agent:', error);
+      console.error('Error deleting user:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
-      setError(axiosError.response?.data?.message || 'Failed to delete agent');
+      setError(axiosError.response?.data?.message || 'Failed to delete user');
     }
   };
 
@@ -213,18 +217,18 @@ const Agents: React.FC = () => {
   return (
     <>
       <Head>
-        <title>Agent Management - CRM Pro</title>
+        <title>User Management - CRM Pro</title>
       </Head>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <Sidebar />
         <div className="ml-64">
-          <Navbar title="Agent Management" />
+          <Navbar title="User Management" />
 
           <main className="p-8">
             <div className="mb-6 flex items-center gap-3">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-purple-100 text-purple-700">
                 <FaUserShield />
-                Admin Only - Manage Your Team
+                Admin Only - Create & Manage Users
               </div>
             </div>
 
@@ -311,7 +315,7 @@ const Agents: React.FC = () => {
                 onClick={() => openModal()}
                 className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all font-semibold"
               >
-                <FaPlus /> Add New Agent
+                <FaPlus /> Add New User
               </button>
             </div>
 
@@ -327,7 +331,7 @@ const Agents: React.FC = () => {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                      <th className="text-left py-4 px-6 font-semibold text-slate-600">Agent</th>
+                      <th className="text-left py-4 px-6 font-semibold text-slate-600">User</th>
                       <th className="text-left py-4 px-6 font-semibold text-slate-600">Contact</th>
                       <th className="text-center py-4 px-6 font-semibold text-slate-600">Customers</th>
                       <th className="text-center py-4 px-6 font-semibold text-slate-600">Sales</th>
@@ -350,14 +354,24 @@ const Agents: React.FC = () => {
                           <tr key={agent._id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                             <td className="py-4 px-6">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
-                                  {(agent.name || `${agent.firstName}`)?.[0]?.toUpperCase() || 'A'}
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                                  agent.role === 'admin' ? 'bg-gradient-to-br from-red-500 to-orange-500' :
+                                  agent.role === 'manager' ? 'bg-gradient-to-br from-green-500 to-teal-500' :
+                                  'bg-gradient-to-br from-blue-500 to-purple-500'
+                                }`}>
+                                  {agent.role === 'admin' ? <FaCrown /> :
+                                   agent.role === 'manager' ? <FaUserCog /> :
+                                   (agent.name || `${agent.firstName}`)?.[0]?.toUpperCase() || 'A'}
                                 </div>
                                 <div>
                                   <p className="font-semibold text-slate-800">
                                     {agent.name || `${agent.firstName || ''} ${agent.lastName || ''}`.trim()}
                                   </p>
-                                  <p className="text-xs text-slate-500 capitalize">{agent.role}</p>
+                                  <p className="text-xs text-slate-500 capitalize flex items-center gap-1">
+                                    {agent.role === 'admin' && <FaCrown className="text-yellow-500" />}
+                                    {agent.role === 'manager' && <FaUserCog className="text-green-500" />}
+                                    {agent.role}
+                                  </p>
                                 </div>
                               </div>
                             </td>
@@ -388,14 +402,14 @@ const Agents: React.FC = () => {
                                 <button
                                   onClick={() => openModal(agent)}
                                   className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                                  title="Edit Agent"
+                                  title="Edit User"
                                 >
                                   <FaEdit />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(agent._id)}
                                   className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                  title="Delete Agent"
+                                  title="Delete User"
                                 >
                                   <FaTrash />
                                 </button>
@@ -418,7 +432,7 @@ const Agents: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
               <h2 className="text-xl font-bold text-slate-800">
-                {editingAgent ? 'Edit Agent' : 'Create New Agent'}
+                {editingAgent ? 'Edit User' : 'Create New User'}
               </h2>
               <button
                 onClick={closeModal}
@@ -439,7 +453,7 @@ const Agents: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                  placeholder="Enter agent's full name"
+                  placeholder="Enter user's full name"
                   required
                 />
               </div>
@@ -451,7 +465,7 @@ const Agents: React.FC = () => {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                  placeholder="agent@example.com"
+                  placeholder="user@example.com"
                   required
                 />
               </div>
@@ -481,6 +495,25 @@ const Agents: React.FC = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">User Role *</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'manager' | 'agent' })}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                  required
+                >
+                  <option value="agent">Agent - Regular User</option>
+                  <option value="manager">Manager - Team Manager</option>
+                  <option value="admin">Admin - Full Access</option>
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  {formData.role === 'admin' && 'Full system access and user management'}
+                  {formData.role === 'manager' && 'Can manage team and view reports'}
+                  {formData.role === 'agent' && 'Standard user access'}
+                </p>
+              </div>
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
@@ -493,7 +526,7 @@ const Agents: React.FC = () => {
                   type="submit"
                   className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all font-semibold"
                 >
-                  {editingAgent ? 'Update Agent' : 'Create Agent'}
+                  {editingAgent ? 'Update User' : 'Create User'}
                 </button>
               </div>
             </form>

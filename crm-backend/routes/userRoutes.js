@@ -5,7 +5,8 @@ const { auth, isAdmin } = require('../middlewares/auth');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
 
-router.post('/register', register);
+// Public registration is DISABLED - Only admins can create users
+// router.post('/register', register);
 router.post('/login', login);
 router.get('/profile', auth, async (req, res) => {
   try {

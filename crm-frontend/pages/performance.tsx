@@ -35,7 +35,7 @@ ChartJS.register(
 );
 
 const PerformancePage: React.FC = () => {
-  const { isLoading } = useAuth();
+  const { isLoading, user } = useAuth();
   const [performanceData, setPerformanceData] = useState<Performance[]>([]);
   const [agents, setAgents] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -45,23 +45,35 @@ const PerformancePage: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   useEffect(() => {
-    fetchData();
-    // Auto-refresh every 30 seconds for real-time updates
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!isLoading && user) {
+      fetchData();
+      // Auto-refresh every 30 seconds for real-time updates
+      const interval = setInterval(fetchData, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoading, user]);
 
   const fetchData = async (): Promise<void> => {
     try {
-      const [performance, agentsData] = await Promise.all([
-        dataService.fetchAllPerformance(),
-        dataService.fetchAllUsers(),
-      ]);
+      // Always fetch performance data
+      const performance = await dataService.fetchAllPerformance();
       setPerformanceData(performance);
-      setAgents(agentsData);
+      
+      // Only fetch agents if user is admin (for display purposes)
+      if (user?.role === 'admin') {
+        try {
+          const agentsData = await dataService.fetchAllAgents();
+          setAgents(agentsData.filter(a => a.role === 'agent'));
+        } catch (agentError) {
+          console.error('Failed to fetch agents:', agentError);
+          // Continue without agents list, will show user IDs instead
+          setAgents([]);
+        }
+      }
+      
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('Failed to fetch data:', error);
+      console.error('Failed to fetch performance data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);

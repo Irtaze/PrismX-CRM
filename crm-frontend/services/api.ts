@@ -424,6 +424,16 @@ export interface AgentInput {
   phoneNumber?: string;
 }
 
+export interface UserInput {
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+  password: string;
+  phoneNumber?: string;
+  role: 'admin' | 'manager' | 'agent';
+}
+
 export interface AgentStats {
   agent: Agent;
   stats: {
@@ -435,16 +445,79 @@ export interface AgentStats {
 }
 
 export const adminAPI = {
-  // Agent management
+  // User management (all roles)
+  createUser: (data: UserInput) => api.post<{ message: string; user: Agent }>('/admin/users', data),
+  getAllUsers: () => api.get<Agent[]>('/admin/users'),
+  updateUser: (id: string, data: Partial<UserInput>) => api.put<{ message: string; user: Agent }>(`/admin/users/${id}`, data),
+  deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
+  
+  // Agent management (backward compatibility)
   createAgent: (data: AgentInput) => api.post<{ message: string; agent: Agent }>('/admin/agents', data),
   getAgents: () => api.get<Agent[]>('/admin/agents'),
   getAgentById: (id: string) => api.get<Agent>(`/admin/agents/${id}`),
   updateAgent: (id: string, data: Partial<AgentInput>) => api.put<{ message: string; agent: Agent }>(`/admin/agents/${id}`, data),
   deleteAgent: (id: string) => api.delete(`/admin/agents/${id}`),
   getAgentStats: (id: string) => api.get<AgentStats>(`/admin/agents/${id}/stats`),
-  
-  // All users
-  getAllUsers: () => api.get<Agent[]>('/admin/users'),
+};
+
+// Dashboard APIs
+export interface DashboardStats {
+  totalCustomers: number;
+  totalSales: number;
+  totalRevenue: number;
+  totalAgents?: number;
+  activeAgents?: number;
+  conversionRate: number;
+  targetProgress: number;
+}
+
+export interface DashboardTrends {
+  customersTrend?: number;
+  salesTrend: number;
+  revenueTrend: number;
+  agentsTrend?: number;
+  conversionTrend: number;
+  targetTrend: number;
+}
+
+export interface DashboardResponse {
+  stats: DashboardStats;
+  trends: DashboardTrends;
+  recentSales: Array<{
+    _id: string;
+    customerName: string;
+    agentName?: string;
+    amount: number;
+    status: string;
+    date: string;
+  }>;
+  topPerformers?: Array<{
+    _id: string;
+    name: string;
+    totalSales: number;
+    totalRevenue: number;
+    conversionRate: number;
+  }>;
+  period: string;
+  userInfo?: {
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+}
+
+export const dashboardAPI = {
+  getAdminDashboard: (period?: string) => api.get<DashboardResponse>('/dashboard/admin', { params: { period } }),
+  getAgentDashboard: (period?: string) => api.get<DashboardResponse>('/dashboard/agent', { params: { period } }),
+  getDashboardSummary: () => api.get<{
+    totalCustomers: number;
+    totalSales: number;
+    totalRevenue: number;
+    totalAgents: number;
+    activeTargets: number;
+    lastUpdated: string;
+  }>('/dashboard/summary'),
 };
 
 export default api;

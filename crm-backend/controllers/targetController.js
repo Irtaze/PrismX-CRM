@@ -1,10 +1,18 @@
 const Target = require('../models/Target');
 
 exports.createTarget = async (req, res) => {
-  const { userID, targetAmount, period, startDate, endDate, status } = req.body;
+  const { userID, targetAmount, period, startDate, endDate, status, achieved } = req.body;
+  const authenticatedUserId = req.user._id;
+  
+  // Determine which userID to use
+  let finalUserID = userID;
+  if (!userID) {
+    // If no userID provided, use the authenticated user's ID
+    finalUserID = authenticatedUserId;
+  }
   
   // Validation
-  if (!userID) {
+  if (!finalUserID) {
     return res.status(400).json({ message: 'Validation error: userID is required' });
   }
   if (!targetAmount || targetAmount <= 0) {
@@ -24,8 +32,18 @@ exports.createTarget = async (req, res) => {
   }
   
   try {
-    const newTarget = new Target({ userID, targetAmount, period, startDate, endDate, status });
+    const newTarget = new Target({
+      userID: finalUserID,
+      targetAmount,
+      period,
+      startDate,
+      endDate,
+      achieved: achieved || 0,
+      status: status || 'in_progress',
+    });
     await newTarget.save();
+    // Populate userID before sending response
+    await newTarget.populate('userID');
     res.status(201).json(newTarget);
   } catch (err) {
     if (err.name === 'ValidationError') {
@@ -56,16 +74,31 @@ exports.getTargetById = async (req, res) => {
 };
 
 exports.updateTarget = async (req, res) => {
-  const { targetAmount, period, startDate, endDate, achieved, status } = req.body;
+  const { targetAmount, period, startDate, endDate, achieved, status, userID } = req.body;
   try {
+    // Build update object
+    const updateData = {};
+    if (targetAmount !== undefined) updateData.targetAmount = targetAmount;
+    if (period !== undefined) updateData.period = period;
+    if (startDate !== undefined) updateData.startDate = startDate;
+    if (endDate !== undefined) updateData.endDate = endDate;
+    if (achieved !== undefined) updateData.achieved = achieved;
+    if (status !== undefined) updateData.status = status;
+    if (userID !== undefined) updateData.userID = userID;
+
     const target = await Target.findByIdAndUpdate(
       req.params.id,
-      { targetAmount, period, startDate, endDate, achieved, status },
-      { new: true }
+      updateData,
+      { new: true, runValidators: true }
     ).populate('userID');
+    
     if (!target) return res.status(404).json({ message: 'Target not found' });
     res.json(target);
   } catch (err) {
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ message: 'Validation error', errors });
+    }
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };

@@ -133,12 +133,9 @@ const Login: React.FC = () => {
               </button>
             </form>
 
-            {/* Register Link */}
-            <p className="text-center mt-6 text-slate-400">
-              Don&apos;t have an account?{' '}
-              <Link href="/register" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
-                Create Account
-              </Link>
+            {/* Info Message */}
+            <p className="text-center mt-6 text-slate-400 text-sm">
+              Need access? Contact your system administrator.
             </p>
           </div>
         </div>

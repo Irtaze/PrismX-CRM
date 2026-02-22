@@ -28,6 +28,7 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/services', require('./routes/serviceRoutes'));
 app.use('/api/customer-services', require('./routes/customerServiceRoutes'));
+app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -1,6 +1,160 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 
+// Create a new user with any role (Admin only)
+exports.createUser = async (req, res) => {
+  const { name, firstName, lastName, email, password, phoneNumber, role } = req.body;
+  
+  // Validation
+  let finalFirstName = firstName || '';
+  let finalLastName = lastName || '';
+  let finalName = name || '';
+  
+  // Parse name if provided as single field
+  if (name && !firstName && !lastName) {
+    const nameParts = name.trim().split(' ');
+    finalFirstName = nameParts[0] || 'User';
+    finalLastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'User';
+  } else if (firstName || lastName) {
+    finalName = `${firstName || ''} ${lastName || ''}`.trim();
+  }
+  
+  // Ensure both names have values
+  if (!finalFirstName) finalFirstName = 'User';
+  if (!finalLastName) finalLastName = 'User';
+  if (!finalName) finalName = `${finalFirstName} ${finalLastName}`.trim();
+  
+  // Validation
+  if (!email || email.trim() === '') {
+    return res.status(400).json({ message: 'Validation error: email is required' });
+  }
+  if (!password || password.length < 6) {
+    return res.status(400).json({ message: 'Validation error: password must be at least 6 characters' });
+  }
+  
+  // Role validation - default to 'agent' if not provided or invalid
+  const validRoles = ['admin', 'manager', 'agent'];
+  const userRole = (role && validRoles.includes(role)) ? role : 'agent';
+  
+  // Email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: 'Validation error: please provide a valid email address' });
+  }
+  
+  try {
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User with this email already exists' });
+    }
+    
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    
+    // Create new user
+    const newUser = new User({
+      firstName: finalFirstName,
+      lastName: finalLastName,
+      name: finalName,
+      email,
+      password: hashedPassword,
+      phoneNumber,
+      role: userRole
+    });
+    
+    await newUser.save();
+    
+    // Return user without password
+    const userResponse = {
+      _id: newUser._id,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      name: newUser.name,
+      email: newUser.email,
+      phoneNumber: newUser.phoneNumber,
+      role: newUser.role,
+      createdAt: newUser.createdAt
+    };
+    
+    res.status(201).json({ message: `User created successfully with role: ${userRole}`, user: userResponse });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+// Update user (Admin only)
+exports.updateUser = async (req, res) => {
+  const { name, firstName, lastName, email, phoneNumber, password, role } = req.body;
+  
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const updateData = {};
+    
+    // Handle name updates
+    if (name || firstName || lastName) {
+      if (name) updateData.name = name;
+      if (firstName) updateData.firstName = firstName;
+      if (lastName) updateData.lastName = lastName;
+    }
+    
+    if (email) updateData.email = email;
+    if (phoneNumber) updateData.phoneNumber = phoneNumber;
+    
+    // Update role if provided and valid
+    if (role && ['admin', 'manager', 'agent'].includes(role)) {
+      updateData.role = role;
+    }
+    
+    // If password is being updated, hash it
+    if (password && password.length >= 6) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(password, salt);
+    }
+    
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    ).select('-password');
+    
+    res.json({ message: 'User updated successfully', user: updatedUser });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+// Delete user (Admin only)
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Prevent deleting yourself
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(403).json({ message: 'Cannot delete your own account' });
+    }
+    
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 // Create a new agent (Admin only)
 exports.createAgent = async (req, res) => {
   const { name, firstName, lastName, email, password, phoneNumber } = req.body;

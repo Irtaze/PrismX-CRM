@@ -28,38 +28,65 @@ ChartJS.register(
   Legend
 );
 
+interface TargetFormData {
+  targetAmount: number;
+  achieved: number;
+  period: string;
+  startDate: string;
+  endDate: string;
+  userID?: string;
+  status?: string;
+}
+
 const Targets: React.FC = () => {
-  const { isLoading } = useAuth();
+  const { isLoading, user } = useAuth();
   const [targets, setTargets] = useState<Target[]>([]);
   const [agents, setAgents] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [editingTarget, setEditingTarget] = useState<Target | null>(null);
   const [error, setError] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string>('');
   const [showGraphs, setShowGraphs] = useState<boolean>(true);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
-  const [formData, setFormData] = useState<TargetInput>({
+  const [formData, setFormData] = useState<TargetFormData>({
     targetAmount: 0,
+    achieved: 0,
     period: 'monthly',
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    userID: '',
+    status: 'in_progress',
   });
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!isLoading && user) {
+      fetchData();
+    }
+  }, [isLoading, user]);
 
   const fetchData = async (): Promise<void> => {
     try {
-      const [targetsData, agentsData] = await Promise.all([
-        dataService.fetchAllTargets(),
-        dataService.fetchAllUsers(),
-      ]);
+      setLoading(true);
+      
+      // Always fetch targets
+      const targetsData = await dataService.fetchAllTargets();
       setTargets(targetsData);
-      setAgents(agentsData);
+      
+      // Only fetch agents if user is admin (for the dropdown in form)
+      if (user?.role === 'admin') {
+        try {
+          const agentsData = await dataService.fetchAllAgents();
+          setAgents(agentsData.filter(a => a.role === 'agent'));
+        } catch (agentError) {
+          console.error('Failed to fetch agents:', agentError);
+          // Continue without agents list, they can still view targets
+          setAgents([]);
+        }
+      }
     } catch (error) {
-      console.error('Failed to fetch data:', error);
-      setError('Failed to load data. Please refresh the page.');
+      console.error('Failed to fetch targets:', error);
+      setError('Failed to load targets data. Please refresh the page.');
     } finally {
       setLoading(false);
     }
@@ -72,18 +99,22 @@ const Targets: React.FC = () => {
     } catch (error) {
       console.error('Failed to fetch targets:', error);
       setError('Failed to load targets data. Please refresh the page.');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     
     // Frontend validation
     if (formData.targetAmount <= 0) {
       setError('Target amount must be greater than 0');
+      return;
+    }
+
+    if (formData.achieved < 0) {
+      setError('Achieved amount cannot be negative');
       return;
     }
     
@@ -92,14 +123,43 @@ const Targets: React.FC = () => {
       return;
     }
 
+    if (!formData.userID && user?.role === 'admin') {
+      setError('Please select an agent');
+      return;
+    }
+
     try {
-      if (editingTarget) {
-        await dataService.updateTarget(editingTarget._id, formData);
-      } else {
-        await dataService.createTarget(formData);
+      const submitData: any = {
+        targetAmount: formData.targetAmount,
+        achieved: formData.achieved,
+        period: formData.period,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        status: formData.status,
+      };
+
+      // Add userID if admin is creating/editing, otherwise use current user
+      if (user?.role === 'admin' && formData.userID) {
+        submitData.userID = formData.userID;
+      } else if (user?.role === 'agent' && editingTarget) {
+        submitData.userID = editingTarget.userID;
+      } else if (user?.role === 'admin' && !editingTarget && formData.userID) {
+        submitData.userID = formData.userID;
       }
-      fetchTargets();
-      closeModal();
+
+      if (editingTarget) {
+        await dataService.updateTarget(editingTarget._id, submitData);
+        setSuccessMessage('Target updated successfully!');
+      } else {
+        await dataService.createTarget(submitData);
+        setSuccessMessage('Target created successfully!');
+      }
+
+      setTimeout(() => {
+        fetchTargets();
+        closeModal();
+        setSuccessMessage('');
+      }, 1000);
     } catch (error: any) {
       console.error('Failed to save target:', error);
       setError(error.response?.data?.message || 'Failed to save target. Please check all required fields.');
@@ -110,7 +170,11 @@ const Targets: React.FC = () => {
     if (confirm('Are you sure you want to delete this target?')) {
       try {
         await dataService.deleteTarget(id);
-        fetchTargets();
+        setSuccessMessage('Target deleted successfully!');
+        setTimeout(() => {
+          fetchTargets();
+          setSuccessMessage('');
+        }, 1000);
       } catch (error) {
         console.error('Failed to delete target:', error);
         setError('Failed to delete target. Please try again.');
@@ -120,21 +184,28 @@ const Targets: React.FC = () => {
 
   const openModal = (target?: Target): void => {
     setError('');
+    setSuccessMessage('');
     if (target) {
       setEditingTarget(target);
       setFormData({
         targetAmount: target.targetAmount,
+        achieved: target.achieved,
         period: target.period,
         startDate: target.startDate.split('T')[0],
         endDate: target.endDate.split('T')[0],
+        userID: typeof target.userID === 'string' ? target.userID : (target.userID as any)._id,
+        status: target.status,
       });
     } else {
       setEditingTarget(null);
       setFormData({
         targetAmount: 0,
+        achieved: 0,
         period: 'monthly',
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        userID: user?.role === 'admin' ? '' : user?._id,
+        status: 'in_progress',
       });
     }
     setShowModal(true);
@@ -150,16 +221,35 @@ const Targets: React.FC = () => {
     return Math.min(Math.round((achieved / target) * 100), 100);
   };
 
-  const getAgentName = (userID: string): string => {
-    const agent = agents.find(a => a._id === userID);
-    return agent ? `${agent.firstName} ${agent.lastName}` : 'Unknown Agent';
+  const getAgentName = (userID: string | any): string => {
+    let agentId = userID;
+    if (typeof userID === 'object' && userID._id) {
+      agentId = userID._id;
+    }
+    const agent = agents.find(a => a._id === agentId);
+    if (agent) {
+      return agent.firstName && agent.lastName ? `${agent.firstName} ${agent.lastName}` : agent.name || 'Unknown Agent';
+    }
+    return 'Unknown Agent';
   };
+
+  // Filter targets: admins see all, agents see only their own
+  const visibleTargets = useMemo(() => {
+    if (user?.role === 'admin') {
+      return targets;
+    } else {
+      return targets.filter(t => {
+        const targetUserId = typeof t.userID === 'object' ? t.userID._id : t.userID;
+        return targetUserId === user?._id;
+      });
+    }
+  }, [targets, user]);
 
   // Filter targets by period
   const filteredTargets = useMemo(() => {
-    if (selectedPeriod === 'all') return targets;
-    return targets.filter(t => t.period === selectedPeriod);
-  }, [targets, selectedPeriod]);
+    if (selectedPeriod === 'all') return visibleTargets;
+    return visibleTargets.filter(t => t.period === selectedPeriod);
+  }, [visibleTargets, selectedPeriod]);
 
   // Chart data: Per-agent target vs achieved
   const agentChartData = useMemo(() => {
@@ -167,12 +257,13 @@ const Targets: React.FC = () => {
     
     filteredTargets.forEach(target => {
       const agentName = getAgentName(target.userID);
-      if (agentMap.has(target.userID)) {
-        const existing = agentMap.get(target.userID)!;
+      const agentId = typeof target.userID === 'object' ? target.userID._id : target.userID;
+      if (agentMap.has(agentId)) {
+        const existing = agentMap.get(agentId)!;
         existing.target += target.targetAmount;
         existing.achieved += target.achieved;
       } else {
-        agentMap.set(target.userID, {
+        agentMap.set(agentId, {
           target: target.targetAmount,
           achieved: target.achieved,
           name: agentName,
@@ -300,6 +391,15 @@ const Targets: React.FC = () => {
           <Navbar title="Targets" />
 
           <main className="p-8">
+            {successMessage && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-600 rounded-xl flex items-center justify-between">
+                {successMessage}
+                <button onClick={() => setSuccessMessage('')} className="text-green-600 hover:text-green-700">
+                  <FaTimes />
+                </button>
+              </div>
+            )}
+
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
@@ -390,7 +490,7 @@ const Targets: React.FC = () => {
             </div>
 
             {/* Charts Section */}
-            {showGraphs && (
+            {showGraphs && agentChartData.labels.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 {/* Bar Chart - Agent Progress */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 lg:col-span-2">
@@ -419,7 +519,7 @@ const Targets: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredTargets.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-slate-500">
-                  No targets found
+                  {user?.role === 'admin' ? 'No targets found' : 'No targets assigned to you'}
                 </div>
               ) : (
                 filteredTargets.map((target) => {
@@ -439,14 +539,14 @@ const Targets: React.FC = () => {
                           <button
                             onClick={() => openModal(target)}
                             className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                            data-testid={`edit-target-${target._id}`}
+                            title="Edit target"
                           >
                             <FaEdit />
                           </button>
                           <button
                             onClick={() => handleDelete(target._id)}
                             className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                            data-testid={`delete-target-${target._id}`}
+                            title="Delete target"
                           >
                             <FaTrash />
                           </button>
@@ -520,24 +620,46 @@ const Targets: React.FC = () => {
 
         {/* Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-slate-800">
                   {editingTarget ? 'Edit Target' : 'Add Target'}
                 </h2>
-                <button onClick={closeModal} className="text-slate-400 hover:text-slate-600" data-testid="close-modal-button">
+                <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
                   <FaTimes size={20} />
                 </button>
               </div>
 
               {error && (
-                <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl" data-testid="error-message">
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl">
                   {error}
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Agent Selection (Admin only) */}
+                {user?.role === 'admin' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Agent <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.userID || ''}
+                      onChange={(e) => setFormData({ ...formData, userID: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required={!editingTarget}
+                    >
+                      <option value="">-- Select Agent --</option>
+                      {agents.map((agent) => (
+                        <option key={agent._id} value={agent._id}>
+                          {agent.firstName && agent.lastName ? `${agent.firstName} ${agent.lastName}` : agent.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Target Amount ($) <span className="text-red-500">*</span>
@@ -550,7 +672,20 @@ const Targets: React.FC = () => {
                     required
                     min="0.01"
                     step="0.01"
-                    data-testid="targetamount-input"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Achieved Amount ($)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.achieved}
+                    onChange={(e) => setFormData({ ...formData, achieved: Number(e.target.value) })}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="0"
+                    step="0.01"
                   />
                 </div>
 
@@ -560,7 +695,6 @@ const Targets: React.FC = () => {
                     value={formData.period}
                     onChange={(e) => setFormData({ ...formData, period: e.target.value })}
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    data-testid="period-select"
                   >
                     <option value="monthly">Monthly</option>
                     <option value="quarterly">Quarterly</option>
@@ -578,7 +712,6 @@ const Targets: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
-                    data-testid="startdate-input"
                   />
                 </div>
 
@@ -592,14 +725,25 @@ const Targets: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
-                    data-testid="enddate-input"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                  </select>
                 </div>
 
                 <button
                   type="submit"
                   className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 transition-all"
-                  data-testid="submit-target-button"
                 >
                   {editingTarget ? 'Update Target' : 'Add Target'}
                 </button>

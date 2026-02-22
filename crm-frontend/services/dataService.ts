@@ -4,9 +4,11 @@ import {
   targetAPI, 
   performanceAPI, 
   userAPI,
+  adminAPI,
   paymentAPI,
   revenueAPI,
   commentAPI,
+  dashboardAPI,
   Sale,
   Customer,
   Target,
@@ -14,7 +16,8 @@ import {
   User,
   Payment,
   Revenue,
-  Comment
+  Comment,
+  DashboardResponse
 } from './api';
 
 /**
@@ -209,6 +212,16 @@ export const fetchAllUsers = async (): Promise<User[]> => {
   }
 };
 
+export const fetchAllAgents = async (): Promise<User[]> => {
+  try {
+    const response = await adminAPI.getAgents();
+    return response.data as User[];
+  } catch (error) {
+    console.error('Error fetching agents:', error);
+    throw new Error('Failed to fetch agents data');
+  }
+};
+
 export const fetchUserById = async (id: string): Promise<User> => {
   try {
     const response = await userAPI.getById(id);
@@ -393,27 +406,56 @@ export const deleteComment = async (id: string): Promise<void> => {
 
 // ==================== DASHBOARD ANALYTICS ====================
 
-export const fetchDashboardData = async () => {
+/**
+ * Fetch admin dashboard with all statistics and trends
+ */
+export const fetchAdminDashboard = async (period?: string): Promise<DashboardResponse> => {
   try {
-    const [sales, customers, targets, performance] = await Promise.all([
-      fetchAllSales(),
-      fetchAllCustomers(),
-      fetchAllTargets(),
-      fetchAllPerformance()
-    ]);
+    const response = await dashboardAPI.getAdminDashboard(period);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching admin dashboard:', error);
+    throw new Error('Failed to fetch admin dashboard data');
+  }
+};
 
-    return {
-      sales,
-      customers,
-      targets,
-      performance,
-      stats: {
-        totalSales: sales.length,
-        totalRevenue: sales.reduce((sum, sale) => sum + sale.amount, 0),
-        totalCustomers: customers.length,
-        activeTargets: targets.filter(t => t.status === 'in_progress').length,
-      }
-    };
+/**
+ * Fetch agent dashboard (own performance)
+ */
+export const fetchAgentDashboard = async (period?: string): Promise<DashboardResponse> => {
+  try {
+    const response = await dashboardAPI.getAgentDashboard(period);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching agent dashboard:', error);
+    throw new Error('Failed to fetch agent dashboard data');
+  }
+};
+
+/**
+ * Fetch lightweight dashboard summary
+ */
+export const fetchDashboardSummary = async () => {
+  try {
+    const response = await dashboardAPI.getDashboardSummary();
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching dashboard summary:', error);
+    throw new Error('Failed to fetch dashboard summary');
+  }
+};
+
+/**
+ * Fetch dashboard data (legacy - for backward compatibility)
+ * This will call the appropriate endpoint based on user role
+ */
+export const fetchDashboardData = async (userRole?: string) => {
+  try {
+    if (userRole === 'admin' || userRole === 'manager') {
+      return await fetchAdminDashboard();
+    } else {
+      return await fetchAgentDashboard();
+    }
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     throw new Error('Failed to fetch dashboard data');
@@ -450,6 +492,7 @@ const dataService = {
   
   // Users
   fetchAllUsers,
+  fetchAllAgents,
   fetchUserById,
   updateUser,
   deleteUser,
@@ -477,6 +520,9 @@ const dataService = {
   
   // Dashboard
   fetchDashboardData,
+  fetchAdminDashboard,
+  fetchAgentDashboard,
+  fetchDashboardSummary,
 };
 
 export default dataService;
