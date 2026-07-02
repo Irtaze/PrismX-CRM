@@ -131,7 +131,7 @@ export const salesAPI = {
 // Target APIs
 export interface Target {
   _id: string;
-  userID: string;
+  userID: string | { _id: string; name?: string; firstName?: string; lastName?: string; email?: string; role?: string };
   targetAmount: number;
   achieved: number;
   period: string;
@@ -208,8 +208,8 @@ export const revenueAPI = {
   getAll: () => api.get<Revenue[]>('/revenues'),
   getById: (id: string) => api.get<Revenue>(`/revenues/${id}`),
   create: (data: RevenueInput) => api.post<Revenue>('/revenues', data),
-  update: (id: string, data: Partial<RevenueInput>) => api.put<Revenue>(`/revenue/${id}`, data),
-  delete: (id: string) => api.delete(`/revenue/${id}`),
+  update: (id: string, data: Partial<RevenueInput>) => api.put<Revenue>(`/revenues/${id}`, data),
+  delete: (id: string) => api.delete(`/revenues/${id}`),
 };
 
 // Performance APIs

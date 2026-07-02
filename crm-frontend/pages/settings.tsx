@@ -92,13 +92,13 @@ const SettingsPage: React.FC = () => {
   const ToggleSwitch = ({ enabled, onChange }: { enabled: boolean; onChange: (value: boolean) => void }) => (
     <button
       onClick={() => onChange(!enabled)}
-      className={`relative w-14 h-7 rounded-full transition-colors ${
+      className={`relative inline-flex w-14 h-7 rounded-full transition-colors ${
         enabled ? 'bg-blue-500' : 'bg-slate-300'
       }`}
     >
       <span
-        className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-          enabled ? 'translate-x-8' : 'translate-x-1'
+        className={`absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${
+          enabled ? 'translate-x-7' : 'translate-x-0'
         }`}
       />
     </button>

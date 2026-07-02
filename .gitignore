@@ -12,7 +12,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 yarn.lock
-package-lock.json
+/package-lock.json
 
 # IDE & Editor
 .vscode/
@@ -47,6 +47,7 @@ logs/
 .cache/
 .eslintcache
 .swc
+.playwright-mcp/
 
 # Database
 *.db

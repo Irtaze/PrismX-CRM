@@ -145,6 +145,9 @@ const Targets: React.FC = () => {
         submitData.userID = editingTarget.userID;
       } else if (user?.role === 'admin' && !editingTarget && formData.userID) {
         submitData.userID = formData.userID;
+      } else {
+        // For new targets or when no explicit userID is provided, use current user
+        submitData.userID = (user as any)?._id || user?.id;
       }
 
       if (editingTarget) {
@@ -204,7 +207,7 @@ const Targets: React.FC = () => {
         period: 'monthly',
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        userID: user?.role === 'admin' ? '' : user?._id,
+        userID: user?.role === 'admin' ? '' : (user as any)?._id || user?.id,
         status: 'in_progress',
       });
     }
@@ -239,8 +242,8 @@ const Targets: React.FC = () => {
       return targets;
     } else {
       return targets.filter(t => {
-        const targetUserId = typeof t.userID === 'object' ? t.userID._id : t.userID;
-        return targetUserId === user?._id;
+        const targetUserId = t.userID && typeof t.userID === 'object' ? t.userID._id : t.userID;
+        return targetUserId === ((user as any)?._id || user?.id);
       });
     }
   }, [targets, user]);

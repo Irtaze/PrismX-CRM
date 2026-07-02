@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 
 interface User {
@@ -17,6 +17,9 @@ interface UseAuthReturn {
   isManager: boolean;
 }
 
+// Pages that don't require authentication
+const publicPages = ['/login', '/register'];
+
 export const useAuth = (): UseAuthReturn => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -29,7 +32,10 @@ export const useAuth = (): UseAuthReturn => {
 
       if (!token) {
         setIsLoading(false);
-        router.push('/login');
+        // Only redirect to login if not already on a public page
+        if (!publicPages.includes(router.pathname)) {
+          router.replace('/login');
+        }
         return;
       }
 
@@ -44,7 +50,8 @@ export const useAuth = (): UseAuthReturn => {
     };
 
     checkAuth();
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.pathname]);
 
   return {
     user,

@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
   },
   lastName: {
     type: String,
-    required: true,
+    default: '',
   },
   email: {
     type: String,
@@ -18,28 +18,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  phoneNumber: {
+    type: String,
+    default: '',
+  },
   role: {
     type: String,
-    enum: ['admin', 'manager', 'agent'],
-    default: 'agent',
+    enum: ['admin', 'manager', 'agent', 'user'],
+    default: 'user',
   },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
-
-// Custom methods for role checking
-userSchema.methods.isAdmin = function () {
-  return this.role === 'admin';
-};
-
-userSchema.methods.isAgent = function () {
-  return this.role === 'agent';
-};
-
-userSchema.methods.isManager = function () {
-  return this.role === 'manager';
-};
 
 module.exports = mongoose.model('User', userSchema);

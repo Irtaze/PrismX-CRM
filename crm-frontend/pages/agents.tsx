@@ -221,130 +221,147 @@ const Agents: React.FC = () => {
       </Head>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <Sidebar />
-        <div className="ml-64">
+        <div className="ml-0 md:ml-64 transition-all duration-300">
           <Navbar title="User Management" />
 
-          <main className="p-8">
-            <div className="mb-6 flex items-center gap-3">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-purple-100 text-purple-700">
-                <FaUserShield />
-                Admin Only - Create & Manage Users
+          <main className="p-4 sm:p-6 md:p-8">
+            <div className="mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3">
+              <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold bg-purple-100 text-purple-700">
+                <FaUserShield className="text-xs sm:text-sm" />
+                <span className="hidden sm:inline">Admin Only - Create & Manage Users</span>
+                <span className="sm:hidden">Admin Only</span>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all ${
-                    refreshing
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                      : 'bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-500/25'
-                  }`}
-                >
-                  <FaSync className={refreshing ? 'animate-spin' : ''} />
-                  {refreshing ? 'Refreshing...' : 'Refresh Data'}
-                </button>
-                <span className="text-sm text-slate-500">
-                  Last updated: {lastUpdated.toLocaleTimeString()}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <FaUserTie className="text-blue-600 text-xl" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Total Agents</p>
-                    <p className="text-2xl font-bold text-slate-800">{agents.length}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <FaDollarSign className="text-green-600 text-xl" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Total Revenue</p>
-                    <p className="text-2xl font-bold text-slate-800">${overallStats.totalRevenue.toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-purple-100 rounded-xl">
-                    <FaTrophy className="text-purple-600 text-xl" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Total Sales</p>
-                    <p className="text-2xl font-bold text-slate-800">{overallStats.totalSales}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-orange-100 rounded-xl">
-                    <FaUsers className="text-orange-600 text-xl" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Total Customers</p>
-                    <p className="text-2xl font-bold text-slate-800">{overallStats.totalCustomers}</p>
-                  </div>
+            <div className="flex flex-col gap-4 mb-4 sm:mb-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                  <button
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2 rounded-lg sm:rounded-xl text-sm sm:text-base font-semibold transition-all active:scale-95 duration-200 ${
+                      refreshing
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : 'bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-500/25'
+                    }`}
+                  >
+                    <FaSync className={`text-sm sm:text-base ${refreshing ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+                    <span className="sm:hidden">{refreshing ? '...' : 'Refresh'}</span>
+                  </button>
+                  <span className="text-xs sm:text-sm text-slate-500 whitespace-nowrap">
+                    Last updated: {lastUpdated.toLocaleTimeString()}
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-              <div className="relative flex-1 max-w-md">
-                <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6">
+              <div className="bg-white rounded-lg sm:rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="p-2 sm:p-3 bg-blue-100 rounded-lg sm:rounded-xl flex-shrink-0">
+                    <FaUserTie className="text-blue-600 text-base sm:text-lg md:text-xl" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-slate-500">Total Agents</p>
+                    <p className="text-lg sm:text-2xl font-bold text-slate-800 truncate">{agents.length}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg sm:rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="p-2 sm:p-3 bg-green-100 rounded-lg sm:rounded-xl flex-shrink-0">
+                    <FaDollarSign className="text-green-600 text-base sm:text-lg md:text-xl" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-slate-500">Total Revenue</p>
+                    <p className="text-lg sm:text-2xl font-bold text-slate-800 truncate">${overallStats.totalRevenue.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg sm:rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="p-2 sm:p-3 bg-purple-100 rounded-lg sm:rounded-xl flex-shrink-0">
+                    <FaTrophy className="text-purple-600 text-base sm:text-lg md:text-xl" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-slate-500">Total Sales</p>
+                    <p className="text-lg sm:text-2xl font-bold text-slate-800 truncate">{overallStats.totalSales}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg sm:rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="p-2 sm:p-3 bg-orange-100 rounded-lg sm:rounded-xl flex-shrink-0">
+                    <FaUsers className="text-orange-600 text-base sm:text-lg md:text-xl" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-slate-500">Total Customers</p>
+                    <p className="text-lg sm:text-2xl font-bold text-slate-800 truncate">{overallStats.totalCustomers}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row md:items-center md:justify-between gap-3 sm:gap-4 mb-6">
+              <div className="relative flex-1 max-w-lg">
+                <FaSearch className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm sm:text-base" />
                 <input
                   type="text"
                   placeholder="Search agents..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                  className="w-full pl-10 sm:pl-12 pr-4 py-2 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
                 />
               </div>
 
-              <button
-                onClick={() => openModal()}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all font-semibold"
-              >
-                <FaPlus /> Add New User
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                <button
+                  onClick={() => openModal()}
+                  className="flex items-center justify-center sm:justify-start gap-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all font-semibold text-sm sm:text-base active:scale-95 duration-200"
+                >
+                  <FaPlus className="text-sm sm:text-base" /> 
+                  <span className="hidden sm:inline">Add New User</span>
+                  <span className="sm:hidden">Add User</span>
+                </button>
+
+                <button
+                  onClick={() => router.push('/add-agent')}
+                  className="flex items-center justify-center sm:justify-start gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-emerald-500/25 transition-all font-semibold text-sm sm:text-base active:scale-95 duration-200"
+                >
+                  <FaUserTie className="text-sm sm:text-base" /> 
+                  <span className="hidden sm:inline">Add Agent</span>
+                  <span className="sm:hidden">Add</span>
+                </button>
+              </div>
             </div>
 
             {success && !showModal && (
-              <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-xl">{success}</div>
+              <div className="mb-4 p-3 sm:p-4 bg-green-100 text-green-700 rounded-lg sm:rounded-xl text-sm sm:text-base">{success}</div>
             )}
             {error && !showModal && (
-              <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-xl">{error}</div>
+              <div className="mb-4 p-3 sm:p-4 bg-red-100 text-red-700 rounded-lg sm:rounded-xl text-sm sm:text-base">{error}</div>
             )}
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-lg sm:rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full text-sm sm:text-base">
                   <thead>
                     <tr className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                      <th className="text-left py-4 px-6 font-semibold text-slate-600">User</th>
-                      <th className="text-left py-4 px-6 font-semibold text-slate-600">Contact</th>
-                      <th className="text-center py-4 px-6 font-semibold text-slate-600">Customers</th>
-                      <th className="text-center py-4 px-6 font-semibold text-slate-600">Sales</th>
-                      <th className="text-center py-4 px-6 font-semibold text-slate-600">Revenue</th>
-                      <th className="text-center py-4 px-6 font-semibold text-slate-600">Actions</th>
+                      <th className="text-left py-3 sm:py-4 px-3 sm:px-6 font-semibold text-slate-600 text-xs sm:text-sm">User</th>
+                      <th className="text-left py-3 sm:py-4 px-3 sm:px-6 font-semibold text-slate-600 text-xs sm:text-sm hidden sm:table-cell">Contact</th>
+                      <th className="text-center py-3 sm:py-4 px-2 sm:px-6 font-semibold text-slate-600 text-xs sm:text-sm">Customers</th>
+                      <th className="text-center py-3 sm:py-4 px-2 sm:px-6 font-semibold text-slate-600 text-xs sm:text-sm hidden md:table-cell">Sales</th>
+                      <th className="text-center py-3 sm:py-4 px-2 sm:px-6 font-semibold text-slate-600 text-xs sm:text-sm hidden lg:table-cell">Revenue</th>
+                      <th className="text-center py-3 sm:py-4 px-2 sm:px-6 font-semibold text-slate-600 text-xs sm:text-sm">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredAgents.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-12 text-slate-500">
-                          <FaUserTie className="text-4xl mb-2 mx-auto text-slate-300" />
-                          <p>No agents found</p>
+                        <td colSpan={6} className="text-center py-8 sm:py-12 text-slate-500">
+                          <FaUserTie className="text-2xl sm:text-4xl mb-2 mx-auto text-slate-300" />
+                          <p className="text-sm sm:text-base">No agents found</p>
                         </td>
                       </tr>
                     ) : (
@@ -352,9 +369,9 @@ const Agents: React.FC = () => {
                         const stats = agentStats[agent._id] || { totalCustomers: 0, totalSales: 0, totalRevenue: 0 };
                         return (
                           <tr key={agent._id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                            <td className="py-4 px-6">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                            <td className="py-3 sm:py-4 px-3 sm:px-6">
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm flex-shrink-0 ${
                                   agent.role === 'admin' ? 'bg-gradient-to-br from-red-500 to-orange-500' :
                                   agent.role === 'manager' ? 'bg-gradient-to-br from-green-500 to-teal-500' :
                                   'bg-gradient-to-br from-blue-500 to-purple-500'
@@ -363,55 +380,55 @@ const Agents: React.FC = () => {
                                    agent.role === 'manager' ? <FaUserCog /> :
                                    (agent.name || `${agent.firstName}`)?.[0]?.toUpperCase() || 'A'}
                                 </div>
-                                <div>
-                                  <p className="font-semibold text-slate-800">
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-slate-800 text-xs sm:text-base truncate">
                                     {agent.name || `${agent.firstName || ''} ${agent.lastName || ''}`.trim()}
                                   </p>
-                                  <p className="text-xs text-slate-500 capitalize flex items-center gap-1">
-                                    {agent.role === 'admin' && <FaCrown className="text-yellow-500" />}
-                                    {agent.role === 'manager' && <FaUserCog className="text-green-500" />}
-                                    {agent.role}
+                                  <p className="text-xs text-slate-500 capitalize flex items-center gap-1 flex-wrap">
+                                    {agent.role === 'admin' && <FaCrown className="text-yellow-500 flex-shrink-0" />}
+                                    {agent.role === 'manager' && <FaUserCog className="text-green-500 flex-shrink-0" />}
+                                    <span className="truncate">{agent.role}</span>
                                   </p>
                                 </div>
                               </div>
                             </td>
-                            <td className="py-4 px-6">
-                              <div className="flex items-center gap-2 text-slate-600">
-                                <FaEnvelope className="text-slate-400" />
-                                {agent.email}
+                            <td className="py-3 sm:py-4 px-3 sm:px-6 hidden sm:table-cell">
+                              <div className="flex items-center gap-2 text-slate-600 text-xs sm:text-base">
+                                <FaEnvelope className="text-slate-400 flex-shrink-0" />
+                                <span className="truncate">{agent.email}</span>
                               </div>
                               {agent.phoneNumber && (
-                                <p className="text-sm text-slate-500 mt-1">{agent.phoneNumber}</p>
+                                <p className="text-xs text-slate-500 mt-1">{agent.phoneNumber}</p>
                               )}
                             </td>
-                            <td className="py-4 px-6 text-center">
-                              <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                            <td className="py-3 sm:py-4 px-2 sm:px-6 text-center">
+                              <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold text-xs sm:text-sm">
                                 {stats.totalCustomers}
                               </span>
                             </td>
-                            <td className="py-4 px-6 text-center">
-                              <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold">
+                            <td className="py-3 sm:py-4 px-2 sm:px-6 text-center hidden md:table-cell">
+                              <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold text-xs sm:text-sm">
                                 {stats.totalSales}
                               </span>
                             </td>
-                            <td className="py-4 px-6 text-center">
-                              <span className="font-bold text-slate-800">${stats.totalRevenue.toLocaleString()}</span>
+                            <td className="py-3 sm:py-4 px-2 sm:px-6 text-center hidden lg:table-cell">
+                              <span className="font-bold text-slate-800 text-xs sm:text-base">${stats.totalRevenue.toLocaleString()}</span>
                             </td>
-                            <td className="py-4 px-6">
-                              <div className="flex items-center justify-center gap-2">
+                            <td className="py-3 sm:py-4 px-2 sm:px-6">
+                              <div className="flex items-center justify-center gap-1 sm:gap-2">
                                 <button
                                   onClick={() => openModal(agent)}
-                                  className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                  className="p-1.5 sm:p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors active:scale-95 duration-200"
                                   title="Edit User"
                                 >
-                                  <FaEdit />
+                                  <FaEdit className="text-sm sm:text-base" />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(agent._id)}
-                                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                  className="p-1.5 sm:p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors active:scale-95 duration-200"
                                   title="Delete User"
                                 >
-                                  <FaTrash />
+                                  <FaTrash className="text-sm sm:text-base" />
                                 </button>
                               </div>
                             </td>
@@ -429,78 +446,78 @@ const Agents: React.FC = () => {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <h2 className="text-xl font-bold text-slate-800">
+          <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-800">
                 {editingAgent ? 'Edit User' : 'Create New User'}
               </h2>
               <button
                 onClick={closeModal}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors active:scale-95 duration-200"
               >
-                <FaTimes />
+                <FaTimes className="text-sm sm:text-base" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {error && <div className="p-3 bg-red-100 text-red-700 rounded-xl text-sm">{error}</div>}
-              {success && <div className="p-3 bg-green-100 text-green-700 rounded-xl text-sm">{success}</div>}
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+              {error && <div className="p-2 sm:p-3 bg-red-100 text-red-700 rounded-lg sm:rounded-xl text-xs sm:text-sm">{error}</div>}
+              {success && <div className="p-2 sm:p-3 bg-green-100 text-green-700 rounded-lg sm:rounded-xl text-xs sm:text-sm">{success}</div>}
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Full Name *</label>
+                <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1">Full Name *</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                   placeholder="Enter user's full name"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email Address *</label>
+                <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1">Email Address *</label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                   placeholder="user@example.com"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1">
                   Password {editingAgent ? '(leave blank to keep current)' : '*'}
                 </label>
                 <input
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                   placeholder={editingAgent ? '••••••••' : 'Min 6 characters'}
                   required={!editingAgent}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+                <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1">Phone Number</label>
                 <input
                   type="tel"
                   value={formData.phoneNumber}
                   onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                   placeholder="+1 (555) 000-0000"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">User Role *</label>
+                <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1">User Role *</label>
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'manager' | 'agent' })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
                   required
                 >
                   <option value="agent">Agent - Regular User</option>
@@ -514,17 +531,17 @@ const Agents: React.FC = () => {
                 </p>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors font-semibold"
+                  className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border border-slate-200 text-slate-600 text-sm sm:text-base rounded-lg sm:rounded-xl hover:bg-slate-50 transition-colors font-semibold active:scale-95 duration-200"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all font-semibold"
+                  className="flex-1 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm sm:text-base rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all font-semibold active:scale-95 duration-200"
                 >
                   {editingAgent ? 'Update User' : 'Create User'}
                 </button>

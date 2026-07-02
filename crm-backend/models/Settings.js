@@ -1,12 +1,7 @@
 const mongoose = require('mongoose');
 
 const settingsSchema = new mongoose.Schema({
-  userID: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    unique: true,
-  },
+  userID: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
   notifications: {
     emailNotifications: { type: Boolean, default: true },
     pushNotifications: { type: Boolean, default: true },
@@ -16,7 +11,7 @@ const settingsSchema = new mongoose.Schema({
   },
   privacy: {
     showEmail: { type: Boolean, default: true },
-    showPhone: { type: Boolean, default: false },
+    showPhone: { type: Boolean, default: true },
     showPerformance: { type: Boolean, default: true },
   },
   display: {
@@ -25,10 +20,7 @@ const settingsSchema = new mongoose.Schema({
     currency: { type: String, default: 'USD' },
     dateFormat: { type: String, default: 'MM/DD/YYYY' },
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
+  updatedAt: { type: Date, default: Date.now },
 });
 
 module.exports = mongoose.model('Settings', settingsSchema);
